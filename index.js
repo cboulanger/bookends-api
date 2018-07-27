@@ -6,16 +6,18 @@
  */
 
 const osascript = require('node-osascript');
+const util = require('util');
 
 /**
- * Given an event code, return the AppleScript command. 
- * @param  {String} eventCode
+ * Given an event code and additional parameters, return the AppleScript command. 
+ * @param {String} eventCode
+ * @param {mixed} param1, param2, ...
  * @return {String}
  * TODO : move into module
  */
-function eventCode(eventCode) {
+function command(eventCode, ...parameters) {
   // "beginning with Mac OS X Snow Leopard, creator codes are ignored by the operating system"  https://en.wikipedia.org/wiki/Creator_code
-  return 'tell application "Bookends" to «event XXXX' + eventCode + '»';
+  return 'tell application "Bookends" to «event XXXX' + eventCode + '» ' + parameters.join(' ');
 }
 
 /**
@@ -67,7 +69,23 @@ module.exports =
    * @return {Promise} A promise that resolves to a String containing the version number
    */
   getVersion : function() {
-    return evalOSA(eventCode('VERS'),false);
+    return evalOSA(command('VERS'),false);
+  },
+
+  /**
+   * Get unique ids of the selected references or references in a group
+   * @param  {String} groupName Group name (can be “All”. “Hits”, “Attachments”, “Selection”, or the name of a group you created
+   * @return {Promise}  A promise resovling with an array containing
+   * the unique IDs as integer values.
+   */
+  getGroupReferenceIds: function(groupName) {
+    if ( ! groupName || !util.isString(groupName)){
+      throw new Error("Parameter must be a string");
+    } 
+    return evalOSA(command('RUID', `"${groupName}"`), "\r", item => {
+      return item.substring(1, item.length - 2);
+    })
+    .then( result => result.map( item => parseInt(item)));
   },
 
   /**
@@ -93,7 +111,7 @@ module.exports =
   getFieldValues : function(ids, fieldName) {
 
     var cmd = ' "' + ids.join(',') + '"' + ' given string:' + '"' + fieldName + '"';
-    return evalOSA(eventCode('RFLD') + cmd, String.fromCharCode(0));
+    return evalOSA(command('RFLD') + cmd, String.fromCharCode(0));
   },
 
   /**
@@ -104,7 +122,7 @@ module.exports =
   getModificationDates: function(ids) {
     if (!(ids instanceof Array)) throw new Error("ids must be an array.");
     var args = ' "' + ids.join(',') + '"';
-    return evalOSA(eventCode('RMOD') + args, String.fromCharCode(0))
+    return evalOSA(command('RMOD') + args, String.fromCharCode(0))
     .then(function(result) {
       return result.map(function(s) {
         return new Date(
@@ -130,7 +148,7 @@ module.exports =
    */
   getBookendsGroups: function(withFullPath) {
     var args = withFullPath ? ' given «class PATH»: "true"' : "";
-    return evalOSA(eventCode('RGPN') + args, "\r", function(result) {
+    return evalOSA(command('RGPN') + args, "\r", function(result) {
         return result.substring(1, result.length - 2);
       })
       .then(function(result) {
@@ -161,18 +179,7 @@ module.exports =
   },
 
 
-  /**
-   * Get the ids of references in a bookends group
-   * @param group {String} name of the group
-   * @return {Promise} resolves with an Array of reference ids as STRINGS!
-   */
-  getBookendsGroupIDs: function(group) {
-    if (!group) throw new Error("Group must be valid string");
-    var args = ' "' + group + '"';
-    return evalOSA(eventCode('RUID') + args, "\r", function(result) {
-      return result.substring(1, result.length - 2);
-    });
-  },
+
 
   /**
    * Formats references
@@ -187,7 +194,7 @@ module.exports =
       ids = ids.slice(0, 99);
     }
     var args = ' "' + ids.join(',') + '" given «class RRTF»:"false", string:"' + (style || '') + '"';
-    return evalOSA(eventCode('GUID') + args, "\n", function(result) {
+    return evalOSA(command('GUID') + args, "\n", function(result) {
       return result.replace(/\[\#\!\#\]/g, "\n").substring(2, result.length - 2);
     });
 
@@ -270,13 +277,13 @@ module.exports =
   // publisher, location, url, title2, abstract, notes, user1...user20
   set: function(strID, strFieldName, strValue) {
     var args = ' "' + strID + '" given «class FLDN»:"' + strFieldName + '", string:"' + strValue + '"';
-    return evalOSA(eventCode('SFLD') + args);
+    return evalOSA(command('SFLD') + args);
   },
 
 
   // sqlMatchIDs :: String -> [String]
   // SELECT clause without the leading SELECT keyword
   sqlMatchIDs: function(strClause) {
-    return evalOSA(eventCode('SQLS') + ' "' + strClause + '"');
+    return evalOSA(command('SQLS') + ' "' + strClause + '"');
   },
 };
