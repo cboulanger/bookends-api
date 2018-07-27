@@ -1,0 +1,30 @@
+{
+  "name": "bookends-api",
+  "version": "0.0.1",
+  "description": "A NodeJS client for the Bookends reference manager (http://www.sonnysoftware.com)",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha -- test/*.test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cboulanger/bookends-api.git"
+  },
+  "keywords": [
+    "Bookends",
+    "Bibliography",
+    "Reference Management"
+  ],
+  "author": "Christian Boulanger (cboulanger)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/cboulanger/bookends-api/issues"
+  },
+  "homepage": "https://github.com/cboulanger/bookends-api#readme",
+  "dependencies": {
+    "node-osascript": "^2.0.0"
+  },
+  "devDependencies": {
+    "mocha": "^5.2.0"
+  }
+}
