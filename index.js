@@ -29,6 +29,14 @@ function quote(str){
 }
 
 /**
+ * Trims the result of an OSA command to the relevant data
+ * @param {String} item 
+ */
+function trimOsaResult(item) {
+  return item.substring(1, item.length - 2);
+}
+
+/**
  * Execute a command via OSA and process the result. Returns a Promise
  * that resolves to an array of Strings (splitChar: String|undefined) or a 
  * String (splitChar: false). 
@@ -55,9 +63,9 @@ function evalOSA(OSACommand, splitChar, transformFunc) {
           if (typeof transformFunc == "function") {
             result = transformFunc(result);
           }
-          // split unless splitChar is false
-          if (splitChar !== false){
-            result = result.split(new RegExp(splitChar || "\r"));
+          // split unless splitChar is false, trim the array items
+          if (splitChar !== false) {
+            result = result.split(new RegExp(splitChar || "\r")).map(item => item.trim());
           }
           resolve(result);
         }
@@ -90,10 +98,8 @@ module.exports =
     if ( ! groupName || !util.isString(groupName)){
       throw new Error("Parameter must be a string");
     } 
-    return evalOSA(command('RUID', quote(groupName)), "\r", item => {
-      return item.substring(1, item.length - 2);
-    })
-    .then( result => result.map( item => parseInt(item)));
+    return evalOSA(command('RUID', quote(groupName)), "\r", trimOsaResult)
+    .then( result => result.map( item => parseInt(item)) );
   },
 
   /**
@@ -102,26 +108,73 @@ module.exports =
    * @return {Promise}  A promise resovling with an array containing
    * the unique IDs of all found references as integer values.
    */
-  search: function(search) {
+  searchReferences: function(search) {
     if ( ! search || !util.isString(search)){
       throw new Error("Parameter must be a string");
     } 
-    return evalOSA(command('SQLS', quote(search)), "\r", item => {
-      return item.substring(1, item.length - 2);
-    })
+    return evalOSA(command('SQLS', quote(search)), "\r", trimOsaResult)
     .then( result => result.map( item => parseInt(item)));
   },
 
   /**
-   * Adds a collection. Not implemented in Bookends since collections cannot
-   * be programmatically created yet.
-   * @param {Map} data A Map containing the collection data. Must have at least
-   *                   these keys: name {String}, parent : {String}
-   * @return {Promise}  A Promise which resolves with the newly created key of the
-   *                    collection
+   * Ask Bookends to return formatted references.
+   * Given the unique id, you can obtain the formatted reference, as plain text or RTF.
+   * Returns a promise that resolves to an Array containing the formatted references. 
+   * @param {Array} ids 
+   * @param {String} format
+   * @param {Boolean} asRtf 
+   * @return {Promise}
    */
-  addGroup : async function(name){
-    throw new Error("Collections cannot be created in Bookends.");
+  formatReferences: function(ids, format, asRtf=false) {
+    if ( ! util.isArray(ids)){
+      throw new Error("First parameter must be an Array");
+    } 
+    if ( ! format || ! util.isString(format)){
+      throw new Error("Second parameter must be a non-empty String");
+    }
+    let cmd = command('GUID', 
+      quote(ids.join(',')), 
+      `given «class RRTF»:"${asRtf?'true':'false'}", string:"${format}"`
+    );
+    return evalOSA(cmd, "\r\r", item => item.substring(1, item.length-3));
+  },
+
+  /**
+   * Get group names.
+   * Returns a Promise that resolves to an array of names of all user-created groups, static and smart, 
+   * in the frontmost library window, sorted alphabetically by group name.
+   * 
+   * @param {Boolean} includePath 
+   *  if True Bookends will return the folder hierarchy for each group, where slashes separates the folders 
+   *  and groups: "top folder/inner folder/group name". Note that the items will be ordered by group name, 
+   *  not the full path, so that zfolder/a comes before afolder/b. If a group name contains a slash (/), 
+   *  it will be escaped as //.
+   * @return {Promise}
+   */
+  getGroupNames : function(includePath=false) {
+    let cmd = command('RGPN',
+      `given «class PATH»:"${includePath?'true':'false'}"`
+    );
+    return evalOSA(cmd, "\r", item => item.substring(1, item.length-3));
+  },
+
+  /**
+   * Create a new static group and (optionally) populate it with references.
+   * Returns a Promise that resolves to the name of the added group.  This is helpful when you specify a 
+   * name that is already in use and Bookends appends a number to make it unique.
+   * @param {String} groupName 
+   * @param {Array|undefined} ids 
+   * @return {Promise}
+   */
+  addStaticGroup : function(groupName, ids=[]) {
+    if ( ! groupName || ! util.isString(groupName)) {
+      throw new Error("First parameter must be a non-empty String");
+    }       
+    if ( ! util.isArray(ids)) {
+      throw new Error("Second parameter must be an Array");
+    } 
+    let cmd = command('ADDG', quote(name), `given string:"${ids.join(',')}"`);
+    return evalOSA(cmd);    
   },
 
   /**
@@ -158,82 +211,6 @@ module.exports =
     });
   },
 
-  /*
-  -------------------------------------------------------------------------
-  Bookends-specific API
-  -------------------------------------------------------------------------
-  */
-
-  /**
-   * Get the names of all groups
-   * @param withFullPath {Boolean} Whether to return the full path of the
-   *    group name
-   * @return {Promise} resolves with an Array of names
-   */
-  getBookendsGroups: function(withFullPath) {
-    var args = withFullPath ? ' given «class PATH»: "true"' : "";
-    return evalOSA(command('RGPN') + args, "\r", function(result) {
-        return result.substring(1, result.length - 2);
-      })
-      .then(function(result) {
-        var map = {};
-        cache.keyMap = {};
-        for (var j = 0; j < result.length; j++) {
-          var collectionName = result[j];
-          // escape "/"
-          collectionName = collectionName.replace(/\/\//g, "<<slash>>");
-          var slugs = collectionName.split(/\//);
-          //...
-
-          for (var i = slugs.length - 1; i >= 0; i--) {
-            var slug = slugs[i].replace(/<<slash\>\>/g, "/");
-            var key = md5(slug);
-            map[slug] = {
-              key: key,
-              name: slug,
-              parentKey: i > 0 ? slugs[i - 1].replace(/<<slash\>\>/g, "/") : false
-            };
-            cache.keyMap[key] = slug;
-          }
-        }
-        //console.dir(map);
-        cache.treeData = map;
-        return map;
-      });
-  },
-
-
-
-
-  /**
-   * Formats references
-   * @param  {Array} ids   An array of numeric ids
-   * @param  {String} style The style. Must be one of the styles defined in bookendsAPI
-   * @return {Array}  An array of strings which contain the formatted references
-   */
-  getFormattedRefs: function(ids, style) {
-    if (!(ids instanceof Array)) throw new Error("ids must be an array.");
-    // max 500 entries
-    if (ids.length > 100) {
-      ids = ids.slice(0, 99);
-    }
-    var args = ' "' + ids.join(',') + '" given «class RRTF»:"false", string:"' + (style || '') + '"';
-    return evalOSA(command('GUID') + args, "\n", function(result) {
-      return result.replace(/\[\#\!\#\]/g, "\n").substring(2, result.length - 2);
-    });
-
-    // Retrieve in smaller chunks
-    // var promises = [];
-    //
-    // while (ids.length) {
-    //   var s = ids.splice(-50, 50);
-    //   var args = ' "' + s.join(',') + '" given «class RRTF»:"false", string:"' + (style || '') + '"';
-    //   promises.push(evalOSA(eventCode('GUID') + args, "\r\r\r", function(result) {
-    //     return result.substring(1, result.length - 2);
-    //   }));
-    // }
-    // return Promise.all(promises);
-  },
 
   /**
    * Given an array of ids, return the normalized reference data
