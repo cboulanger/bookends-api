@@ -155,7 +155,7 @@ module.exports =
     let cmd = command('RGPN',
       `given «class PATH»:"${includePath?'true':'false'}"`
     );
-    return evalOSA(cmd, "\r", item => item.substring(1, item.length-3));
+    return evalOSA(cmd, "\r", item => item.substring(1, item.length-2));
   },
 
   /**
