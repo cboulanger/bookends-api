@@ -20,4 +20,12 @@ describe('Bookends', async function() {
     let idsInFoo1 = await bookends.getGroupReferenceIds('foo1');
     assert.equal( idsInFoo1.length, 2);
   }); 
+
+
+  it('should find references using an sql query', async () => {
+    let refIds = await bookends.search("title REGEX 'Bibliographic'");
+    assert( util.isArray(refIds), "Method did not return an Array");
+    assert.equal( refIds.length, 6, "Incorrect number of found references." );
+  });   
+  //
 });

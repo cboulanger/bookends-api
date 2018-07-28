@@ -21,6 +21,14 @@ function command(eventCode, ...parameters) {
 }
 
 /**
+ * Returns the quoted string
+ * @param {String} str 
+ */
+function quote(str){
+  return '"' + str + '"';
+}
+
+/**
  * Execute a command via OSA and process the result. Returns a Promise
  * that resolves to an array of Strings (splitChar: String|undefined) or a 
  * String (splitChar: false). 
@@ -82,7 +90,23 @@ module.exports =
     if ( ! groupName || !util.isString(groupName)){
       throw new Error("Parameter must be a string");
     } 
-    return evalOSA(command('RUID', `"${groupName}"`), "\r", item => {
+    return evalOSA(command('RUID', quote(groupName)), "\r", item => {
+      return item.substring(1, item.length - 2);
+    })
+    .then( result => result.map( item => parseInt(item)));
+  },
+
+  /**
+   * Get unique ids of references found with an SQL search as detailed in the User Guide.
+   * @param  {String} search Search parameters as you would enter them using Refs -> SQL/Regex Search
+   * @return {Promise}  A promise resovling with an array containing
+   * the unique IDs of all found references as integer values.
+   */
+  search: function(search) {
+    if ( ! search || !util.isString(search)){
+      throw new Error("Parameter must be a string");
+    } 
+    return evalOSA(command('SQLS', quote(search)), "\r", item => {
       return item.substring(1, item.length - 2);
     })
     .then( result => result.map( item => parseInt(item)));
@@ -109,9 +133,9 @@ module.exports =
    * the field contents.
    */
   getFieldValues : function(ids, fieldName) {
-
-    var cmd = ' "' + ids.join(',') + '"' + ' given string:' + '"' + fieldName + '"';
-    return evalOSA(command('RFLD') + cmd, String.fromCharCode(0));
+    return evalOSA(command(
+      'RFLD', quote(ids.join(','), 'given string:', quote(fieldName)
+    )), String.fromCharCode(0));
   },
 
   /**
