@@ -59,4 +59,20 @@ describe('Bookends', async function() {
       'Foo/foo2'
      ]);
   });
+
+  it('should create a static group', async () => {
+    let groupName = "boo1";
+    let idsInFoo1 = await bookends.getGroupReferenceIds('foo1');
+    let createdGroupName = await bookends.createStaticGroup(groupName, idsInFoo1 );
+    assert.equal( createdGroupName, groupName);
+    let idsInBoo1 = await bookends.getGroupReferenceIds('boo1');
+    assert.deepStrictEqual(idsInBoo1, idsInFoo1);
+  });  
+
+  it('should add references to the new group', async () => {
+    let idsInBoo1 = await bookends.getGroupReferenceIds('boo1');
+    let idsInFoo2 = await bookends.getGroupReferenceIds('foo2');
+    let msg = await bookends.addToStaticGroup("boo1", idsInFoo2 );
+    assert.equal( (await bookends.getGroupReferenceIds('boo1')).length, idsInBoo1.length + idsInFoo2.length);
+  });    
 });

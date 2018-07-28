@@ -166,14 +166,32 @@ module.exports =
    * @param {Array|undefined} ids 
    * @return {Promise}
    */
-  addStaticGroup : function(groupName, ids=[]) {
+  createStaticGroup : function(groupName, ids=[]) {
     if ( ! groupName || ! util.isString(groupName)) {
       throw new Error("First parameter must be a non-empty String");
     }       
     if ( ! util.isArray(ids)) {
       throw new Error("Second parameter must be an Array");
     } 
-    let cmd = command('ADDG', quote(name), `given string:"${ids.join(',')}"`);
+    let cmd = command('ADDG', quote(groupName), `given string:"${ids.join(',')}"`);
+    return evalOSA(cmd);    
+  },
+
+  /**
+   * Add references to an existing static group
+   * Returns a Promise with the number of references added. 
+   * @param {String} groupName 
+   * @param {Array|undefined} ids 
+   * @return {Promise}
+   */
+  addToStaticGroup : function(groupName, ids=[]) {
+    if ( ! groupName || ! util.isString(groupName)) {
+      throw new Error("First parameter must be a non-empty String");
+    }       
+    if ( ! util.isArray(ids)) {
+      throw new Error("Second parameter must be an Array");
+    } 
+    let cmd = command('ADTG', quote(groupName), `given string:"${ids.join(',')}"`);
     return evalOSA(cmd);    
   },
 
