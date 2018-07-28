@@ -1,12 +1,16 @@
-/* global describe, it */
+/* global describe, it, beforeEach, afterEach */
 
 const bookends = require( __dirname + '/../index');
+const fixture = require( __dirname + '/fixture' );
 const assert = require('assert');
 const util = require('util');
 
-describe('Bookends', async function() {
-  //this.timeout(2000);
 
+describe('Bookends', async function() {
+  this.timeout(20000);
+  before(fixture.before);
+  after(fixture.after);
+  
   it('should report its version number', async () => {
     let version = await bookends.getVersion();
     assert( util.isString(version), "Version is not a string." );
@@ -54,5 +58,5 @@ describe('Bookends', async function() {
       'Foo/foo1',
       'Foo/foo2'
      ]);
-  });    
+  });
 });

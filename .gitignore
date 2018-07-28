@@ -59,3 +59,5 @@ typings/
 
 # next.js build output
 .next
+test/Bookends-Apple-Events.pdf
+test/bookends.bdb
