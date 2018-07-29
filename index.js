@@ -57,8 +57,12 @@ function evalOSA(OSACommand, splitChar, transformFunc) {
           if ( (result||"").indexOf("No Bookends library window is open") !== -1) {
             err = "No Bookends library window is open";
           }
+          // check for errors
           if ( err ) {
             return reject(err);
+          }
+          if ( util.isString(result) && result.includes('error')) {
+            throw new Error(result);
           }
           // transform
           if (typeof transformFunc == "function") {
@@ -231,13 +235,7 @@ module.exports =
     } catch (e) {
       throw new Error("Data cannot be serialized to JSON: " + e.message);
     }
-    return evalOSA(command( 'SJSN', quote(json) ), false)
-    .then(result => {
-      if ( util.isString(result) && result.includes('error')) {
-        throw new Error(result);
-      }
-      return result;
-    });
+    return evalOSA(command( 'SJSN', quote(json) ), false);
   },
 
   /**
@@ -261,25 +259,36 @@ module.exports =
     });
   },
 
+
+/*
+
+Add a reference and/or attachment to a library
+Tell Bookends to import a reference’s metadata and, optionally, the path to an attachment.
+Event id:
+Parameters (optional): Classes (optional):
+Example:
+ADDA
+Attachment path.
+RIST. Reference metadata in RIS format.
+tell application "Bookends"
+return «event ToySADDA» "/Users/username/Desktop/myPaper.pdf" given
+«class RIST»:"TY - JOUR" & return & "T1 - The Title" & return & "AU - Harrington Joseph" & return & "PY - 2015" & return & "UR - http:// www.sonnysoftware.com" & return
+end tell
+The pathname should be in POSIX format (no escaped characters).
+The reference metadata should be in RIS format, with each tag on a separate line, beginning with the tag
+TY -
+See the Bookends RIS import filter for which tags to use to indicate which fields the metadata are sorted to.
+You can send Bookends just the metadata, just an attachment, or both. Note that a copy of the attachment will be moved to the Bookends default attachment folder—the original will be left alone.
+
+*/
+
   /**
-   * Adds a reference to the bookends database
-   * @param {Map} data Map of key-value pairs containing the normalized field data
+   * Add a reference and/or attachment to a library
+   * @param {Map} data Map of key-value pairs containing the reference data
    * @return {Promise} A Promise resolving with the numeric id of the newly created reference
    */
-  add: function(data) {
-    throw new Error("Not implemented");
-    // var args = "";
-    // if (data.attachments) {
-    //   args += '"' + data.attachments + '"';
-    // }
-    // if (data.type) {
-    //   args += ' given «class RIST»:"';
-    // }
-    // for (var key in data) {
-    //   if (key == "attachments") continue;
-    //
-    // }
-    // return evalOSA(eventCode('ADDA') + args, '\n');
+  addReference: function(data) {
+
   },
 
 
