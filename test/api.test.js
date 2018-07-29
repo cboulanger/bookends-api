@@ -5,7 +5,6 @@ const fixture = require( __dirname + '/fixture' );
 const assert = require('assert');
 const util = require('util');
 
-
 describe('Bookends', async function() {
   this.timeout(20000);
   before(fixture.before);
@@ -75,4 +74,53 @@ describe('Bookends', async function() {
     let msg = await bookends.addToStaticGroup("boo1", idsInFoo2 );
     assert.equal( (await bookends.getGroupReferenceIds('boo1')).length, idsInBoo1.length + idsInFoo2.length);
   });    
+
+  it('should retrieve reference data', async () => {
+    let idsInBoo1 = await bookends.getGroupReferenceIds('foo2');
+    let fields = "type,authors,title,thedate,address,publisher".split(/,/);
+    let data = await bookends.readReferenceData(idsInBoo1, fields);
+    let expected = [ 
+      { authors: 'Bade, David W.',
+        publisher: 'Library Juice Press',
+        thedate: '2007',
+        title: 'Responsible librarianship : library policies for unreliable systems',
+        type: 2,
+        uniqueID: 17235 },
+      { authors: 'Chaplin, A. H.',
+        publisher: 'Library Association',
+        thedate: '1973',
+        title: 'The British Library and AACR: report of a study commissioned by the Department of Education and Science; director of study A. H. Chaplin.',
+        type: 2,
+        uniqueID: 86287 } 
+    ];
+    assert.deepStrictEqual(data,expected);
+  });
+
+  it('should update reference data', async () => {
+    let idsInBoo1 = await bookends.getGroupReferenceIds('foo2');
+    let fields = "type,authors,title,thedate,address,publisher".split(/,/);
+    let data = await bookends.readReferenceData(idsInBoo1, fields);
+    data[0].authors = 'Doe, John';
+    data[0].thedate = 2008;
+    data[1].title = 'The quick brown fox jumps over the lazy dog';
+    await bookends.updateReferenceData(data);
+    data = await bookends.readReferenceData(idsInBoo1, fields);
+    // for some reason, the references are returned in reverse order
+    let expected = [ 
+      { authors: 'Chaplin, A. H.',
+        publisher: 'Library Association',
+        thedate: '1973',
+        title: 'The quick brown fox jumps over the lazy dog',
+        type: 2,
+        uniqueID: 86287 },       
+      { authors: "Doe, John",
+        publisher: 'Library Juice Press',
+        thedate: '2008',
+        title: 'Responsible librarianship : library policies for unreliable systems',
+        type: 2,
+        uniqueID: 17235 }
+    ];
+    assert.deepStrictEqual(data,expected);
+  });    
+
 });

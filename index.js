@@ -21,11 +21,12 @@ function command(eventCode, ...parameters) {
 }
 
 /**
- * Returns the quoted string
+ * Returns the string enclosed by double quotes, with all double quotes escaped
  * @param {String} str 
  */
 function quote(str){
-  return '"' + str + '"';
+  if( ! util.isString(str) ) throw new Error("Argument must be a string.");
+  return '"' + str.replace(/"/g,'\\"') + '"';
 }
 
 /**
@@ -196,18 +197,49 @@ module.exports =
   },
 
   /**
-   * Given one or more ids and a field name, return the local content of the field(s)
-   * of the reference(s) having this/these id(s).
-   * @param  {Array} ids       An array with one or more ids
-   * @param  {String} fieldName The name of the field
-   * @return {Promise}  A promise resovling with an array containing
-   * the field contents.
+   * Given an array of ids and an arry of field names, return an array of objects that
+   * contain the data of the corresponding references with the given fields.
+   * @param  {Array} ids An array with at least one id
+   * @param  {Array} fieldNames An array with at least one field name
+   * @return {Promise}  A promise resolving with to an array of json objects
    */
-  getFieldValues : function(ids, fieldName) {
+  readReferenceData : function(ids, fieldNames) {
+    if ( ! util.isArray(ids) || ids.length < 1 ) {
+      throw new Error("First parameter must be an Array with at least one element");
+    }       
+    if ( ! util.isArray(fieldNames) || fieldNames.length < 1 ) {
+      throw new Error("First parameter must be an Array with at least one element");
+    }     
     return evalOSA(command(
-      'RFLD', quote(ids.join(','), 'given string:', quote(fieldName)
-    )), String.fromCharCode(0));
+      'RJSN', quote(ids.join(',')), 'given string:', quote(fieldNames.join(','))
+    ))
+    .then(result => JSON.parse(result));
   },
+
+  /**
+   * Given an array of object, update the references that have a matching 'uniqueID'.
+   * @param  {Array} data An array with at least one json object
+   * @return {Promise}  A promise resolving with to an array of objects
+   */
+  updateReferenceData : function(data) {
+    if ( ! util.isArray(data) ||data.length < 1 ) {
+      throw new Error("First parameter must be an Array with at least one element");
+    }
+    let json;       
+    try{
+      json = JSON.stringify(data);
+    } catch (e) {
+      throw new Error("Data cannot be serialized to JSON: " + e.message);
+    }
+    return evalOSA(command( 'SJSN', quote(json) ), false)
+    .then(result => {
+      if ( util.isString(result) && result.includes('error')) {
+        throw new Error(result);
+      }
+      return result;
+    });
+  },
+
 
   /**
    * Returns the dates when the references with the given ids were last modified
@@ -228,47 +260,6 @@ module.exports =
       });
     });
   },
-
-
-  /**
-   * Given an array of ids, return the normalized reference data
-   * @param ids {Array}
-   * @return {Promise} A Promise resolving with an array of maps with the reference data
-   */
-  getReferenceData: function(ids) {
-    return this.getFormattedRefs(ids, "Export")
-    .then(function(result) {
-      var data = [], i = 1;
-      result.forEach(function(taggedData) {
-        var dict = {};
-        var fieldName = "", content="";
-        taggedData.split(/\r/).map(function(line) {
-          var i = line.indexOf(":");
-          var maybeFieldName = i > 0 ? line.substring(0, i) : false;
-          if ( maybeFieldName && dictionary.isLocalField(maybeFieldName) ) {
-            fieldName = maybeFieldName;
-            content = line.substring(i + 2);
-            dict[fieldName] = slashes.strip(content);
-          } else if (fieldName ) {
-            // append to current mulit-line field
-            if ( fieldName == "abstract" || fieldName == "notes") {
-              dict[fieldName] += "\n" + line;
-            }
-          }
-        });
-        if (fieldName) {
-          data.push(dict);
-        }
-      });
-      return data;
-    });
-  },
-
-  // return «event ToySADDA» "/Users/username/Desktop/myPaper.pdf" given
-  // «class RIST»:"TY - JOUR" & return & "T1 - The Title" & return &
-  // "AU - Harrington Joseph" & return & "PY - 2015" & return &
-  // "UR - http:// www.sonnysoftware.com" & return
-
 
   /**
    * Adds a reference to the bookends database
@@ -291,18 +282,5 @@ module.exports =
     // return evalOSA(eventCode('ADDA') + args, '\n');
   },
 
-  // fieldWrite :: String -> String -> String -> ()
-  // authors, title, editors, journal, volume, pages, thedate,
-  // publisher, location, url, title2, abstract, notes, user1...user20
-  set: function(strID, strFieldName, strValue) {
-    var args = ' "' + strID + '" given «class FLDN»:"' + strFieldName + '", string:"' + strValue + '"';
-    return evalOSA(command('SFLD') + args);
-  },
 
-
-  // sqlMatchIDs :: String -> [String]
-  // SELECT clause without the leading SELECT keyword
-  sqlMatchIDs: function(strClause) {
-    return evalOSA(command('SQLS') + ' "' + strClause + '"');
-  },
 };
