@@ -8,13 +8,12 @@ const process = require('process');
 
 module.exports = {
   before : async function() {
+    osascript.execute('tell application "Bookends" to quit');
     fs.copyFileSync( bookendsLibraryPath + '.dist', bookendsLibraryPath );
     this.bookendsProcess = spawn(bookendsExecutablePath, [bookendsLibraryPath]);
     await new Promise(resolve => setTimeout( () => resolve(), 5000));
   }, 
   after: async function() {
-    this.bookendsProcess.kill();
-    fs.unlinkSync(bookendsLibraryPath);
-    fs.unlinkSync(bookendsLibraryPath + ".journal");
+    osascript.execute('tell application "Bookends" to quit');
   }
 };  

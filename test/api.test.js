@@ -77,20 +77,22 @@ describe('Bookends', async function() {
 
   it('should retrieve reference data', async () => {
     let idsInBoo1 = await bookends.getGroupReferenceIds('foo2');
-    let fields = "type,authors,title,thedate,address,publisher".split(/,/);
-    let data = await bookends.readReferenceData(idsInBoo1, fields);
+    let fields = "type,authors,title,thedate,location,publisher".split(/,/);
+    let data = await bookends.readReferences(idsInBoo1, fields);
     let expected = [ 
       { authors: 'Bade, David W.',
+        location: "Duluth, Minn.",
         publisher: 'Library Juice Press',
         thedate: '2007',
         title: 'Responsible librarianship : library policies for unreliable systems',
-        type: 2,
+        type: "Book",
         uniqueID: 17235 },
       { authors: 'Chaplin, A. H.',
+        location: "London",
         publisher: 'Library Association',
         thedate: '1973',
         title: 'The British Library and AACR: report of a study commissioned by the Department of Education and Science; director of study A. H. Chaplin.',
-        type: 2,
+        type: "Book",
         uniqueID: 86287 } 
     ];
     assert.deepStrictEqual(data,expected);
@@ -98,34 +100,61 @@ describe('Bookends', async function() {
 
   it('should update reference data', async () => {
     let idsInBoo1 = await bookends.getGroupReferenceIds('foo2');
-    let fields = "type,authors,title,thedate,address,publisher".split(/,/);
-    let data = await bookends.readReferenceData(idsInBoo1, fields);
+    let fields = "type,authors,title,thedate,location,publisher".split(/,/);
+    let data = await bookends.readReferences(idsInBoo1, fields);
     data[0].authors = 'Doe, John';
+    data[0].type = 'Edited book';
     data[0].thedate = 2008;
     data[1].title = 'The quick brown fox jumps over the lazy dog';
-    await bookends.updateReferenceData(data);
-    data = await bookends.readReferenceData(idsInBoo1, fields);
+    await bookends.updateReferences(data);
+    data = await bookends.readReferences(idsInBoo1, fields);
     // for some reason, the references are returned in reverse order
     let expected = [ 
       { authors: 'Chaplin, A. H.',
+        location: "London",
         publisher: 'Library Association',
         thedate: '1973',
         title: 'The quick brown fox jumps over the lazy dog',
-        type: 2,
+        type: "Book",
         uniqueID: 86287 },       
       { authors: "Doe, John",
+        location: "Duluth, Minn.",
         publisher: 'Library Juice Press',
         thedate: '2008',
         title: 'Responsible librarianship : library policies for unreliable systems',
-        type: 2,
+        type: "Edited book",
         uniqueID: 17235 }
     ];
     assert.deepStrictEqual(data,expected);
-  });    
+  });
+
+  it('should create references', async () => {
+    let refs = [ 
+      { authors: 'Doe, Jane',
+        thedate: '2008',
+        title: 'Compiling a bibliography is so much fun!',
+        type: "Journal article",
+        journal: "Journal of Spurious Results",
+        volume: "60(2)",
+        pages: "100-120",
+        keywords: "bibliography; scholarship; example"
+      },
+      { location: "New York",
+        authors: "Nymous, Ano; Doe, John; Doe, Jane",
+        volume: 'Responsible librarianship : library policies for unreliable systems',
+        pages: "1-25",
+        publisher: 'Library Juice Press',
+        thedate: '2008',
+        title: "Introduction",
+        type: "Book chapter",
+      }
+    ];
+    await bookends.addReferences(refs);
+  });     
 
   it('should retrieve modification dates', async () => {
     let allIds = await bookends.getGroupReferenceIds('All');
-    let modDates = await bookends.getModificationDates(allIds);
+    let modDates = await bookends.modificationDates(allIds);
     assert.equal(modDates.length, allIds.length);
     modDates.forEach(date => {
       if ( ! date instanceof Date ) throw new Error("Invalid date in result");

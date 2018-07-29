@@ -54,15 +54,14 @@ function evalOSA(OSACommand, splitChar, transformFunc) {
     try {
       osascript.execute(OSACommand, {},
         function(err, result, raw) {
-          if ( (result||"").indexOf("No Bookends library window is open") !== -1) {
-            err = "No Bookends library window is open";
+          if ( util.isString(result) ){
+            if ( result.includes("No Bookends library window is open") || result.includes("error") ) {
+              err = result;
+            }
           }
           // check for errors
           if ( err ) {
             return reject(err);
-          }
-          if ( util.isString(result) && result.includes('error')) {
-            throw new Error(result);
           }
           // transform
           if (typeof transformFunc == "function") {
@@ -83,6 +82,103 @@ function evalOSA(OSACommand, splitChar, transformFunc) {
 
 module.exports = 
 {
+  /**
+   * The reference types
+   * @return {Array}
+   */
+  getTypes : function() {
+    return [
+      "Artwork",
+      "Audiovisual material",
+      "Book",
+      "Book chapter",
+      "Conference proceedings",
+      "Dissertation",
+      "Edited book",
+      "Editorial",
+      "In press",
+      "Journal article",
+      "Letter",
+      "Map",
+      "Newspaper article",
+      "Patent",
+      "Personal communication",
+      "Review",
+      "Internet"
+    ];
+  },
+
+  /**
+   * Returns a list of fields that Bookends uses
+   * @return {Array}
+   */
+  getFields: function() {
+    return [
+      "authors",
+      "title",
+      "editors",
+      "journal",
+      "volume",
+      "pages",
+      "publisher",
+      "thedate",
+      "location",
+      "title2",
+      "abstract",
+      "keywords",
+      "notes",
+      "user1",
+      "user2",
+      "user3",
+      "user4",
+      "user5",
+      "user6",
+      "user7",
+      "user8",
+      "user9",
+      "user10",
+      "user11",
+      "user12",
+      "user13",
+      "user14",
+      "user15",
+      "user16",
+      "user17",
+      "user18",
+      "user19",
+      "user20",
+      "attachments",
+      "type"
+    ];
+  },
+
+  /**
+   * Given a reference type, return the internal numeric code that Bookends uses
+   * @param {String} type
+   * @return {Number}
+   */
+  codeFromType : function(type) {
+    if ( ! type || !util.isString(type)){
+      throw new Error("Parameter must be a string");
+    } 
+    return this.getTypes().findIndex(item => type == item);
+  },
+
+  /**
+   * Given a reference type code, return its string representation. If there is none, return the code
+   * @param {Number} code
+   * @return {String|Number}
+   */
+  typeFromCode : function(code) {
+    if ( ! util.isNumber(code)) {
+      throw new Error("Parameter must be a number");
+    } 
+    if ( code < 0 || code >= 40 ) {
+      throw new Error("Code out of range");
+    }
+    return this.getTypes()[code] || code;
+  },
+
   /**
    * Get the version number of Bookends
    * @param  {Array} ids       An array with one or more ids
@@ -203,47 +299,113 @@ module.exports =
   /**
    * Given an array of ids and an arry of field names, return an array of objects that
    * contain the data of the corresponding references with the given fields.
-   * @param  {Array} ids An array with at least one id
-   * @param  {Array} fieldNames An array with at least one field name
+   * @param {Array} ids An array with at least one id
+   * @param {Array} fieldNames An array with at least one field name
+   * @param {Boolean} convertType 
+   *    If true, convert the numeric reference type codess into their string representation
+   *    (i.e. 0 => "Journal Article").
    * @return {Promise}  A promise resolving with to an array of json objects
    */
-  readReferenceData : function(ids, fieldNames) {
+  readReferences : function(ids, fieldNames, convertType=true) {
     if ( ! util.isArray(ids) || ids.length < 1 ) {
       throw new Error("First parameter must be an Array with at least one element");
     }       
     if ( ! util.isArray(fieldNames) || fieldNames.length < 1 ) {
       throw new Error("First parameter must be an Array with at least one element");
-    }     
+    }
+    fieldNames.forEach( fieldName => {
+      if ( ! this.getFields().includes(fieldName) ) {
+        throw new Error(`Unknown field '${fieldName}'`);
+      }
+    });
     return evalOSA(command(
       'RJSN', quote(ids.join(',')), 'given string:', quote(fieldNames.join(','))
     ))
-    .then(result => JSON.parse(result));
+    .then(result => {
+      let refs = JSON.parse(result);
+      if( convertType ) {
+        refs = refs.map( item => {
+          item.type = this.typeFromCode(item.type);
+          return item; 
+        });
+      }
+      return refs; 
+    });
   },
 
   /**
    * Given an array of object, update the references that have a matching 'uniqueID'.
+   * Reference types are automatically converted into their internal numeric code.
    * @param  {Array} data An array with at least one json object
-   * @return {Promise}  A promise resolving with to an array of objects
+   * @return {Promise}
    */
-  updateReferenceData : function(data) {
+  updateReferences : function(data) {
     if ( ! util.isArray(data) ||data.length < 1 ) {
       throw new Error("First parameter must be an Array with at least one element");
     }
+    data = data.map( (item, index) => {
+      if ( ! util.isNumber(item.type) ) {
+        let code  = this.codeFromType(item.type);
+        if( code === -1 ) {
+          throw new Error(`Invalid reference type '${item.type}' in reference ${index}.`);
+        }
+        item.type = code;
+        return item;
+      }
+      Object.getOwnPropertyNames(item).forEach( fieldName => {
+        if ( ! this.getFields().includes(fieldName) ) {
+          throw new Error(`Unknown field '${fieldName}'`);
+        }
+      });
+    });
     let json;       
     try{
       json = JSON.stringify(data);
     } catch (e) {
       throw new Error("Data cannot be serialized to JSON: " + e.message);
     }
-    return evalOSA(command( 'SJSN', quote(json) ), false);
+    return evalOSA(command( 'SJSN', quote(json) ), false)
+    .then(result => {
+      if ( result === null) return; 
+      throw new Error(result);
+    });
   },
 
   /**
+   * Add a reference and/or attachment to a library
+   * @param {Map} data Map of key-value pairs containing the reference data
+   * @return {Promise} A Promise resolving with the numeric id of the newly created reference
+   */
+  addReferences: async function(data) {
+    if ( ! util.isArray(data) || data.length < 1 ) {
+      throw new Error("Parameter must be an array with at least one element");
+    } 
+    for ( let i=0; i < data.length; i++) {
+      let item = data[i];
+      if ( ! util.isObject(item) || item.type === undefined ) {
+        throw new Error(`Invalid element ${i}: must be an object with at least the key 'type'`);
+      }
+      // create entry
+      let result = (await evalOSA(command( 'ADDA', '""', `given «class RIST»:"TY - JOUR\n"` ), false));
+      item.uniqueID = parseInt(result.trim());
+    };
+    // update values
+    return this.updateReferences(data);
+  },
+
+  /**
+   * Adds an attachement
+   */
+  addAttachment: function(path) {
+
+  },
+
+    /**
    * Returns the dates when the references with the given ids were last modified
    * @param  {Array} ids An array of numeric ids
    * @return {Promise} A Promise resolving with an array of Date objects
    */
-  getModificationDates: function(ids) {
+  modificationDates: function(ids) {
     if ( ! util.isArray(ids) || ids.length < 1 ) {
       throw new Error("First parameter must be an Array with at least one element");
     }
@@ -258,38 +420,5 @@ module.exports =
       });
     });
   },
-
-
-/*
-
-Add a reference and/or attachment to a library
-Tell Bookends to import a reference’s metadata and, optionally, the path to an attachment.
-Event id:
-Parameters (optional): Classes (optional):
-Example:
-ADDA
-Attachment path.
-RIST. Reference metadata in RIS format.
-tell application "Bookends"
-return «event ToySADDA» "/Users/username/Desktop/myPaper.pdf" given
-«class RIST»:"TY - JOUR" & return & "T1 - The Title" & return & "AU - Harrington Joseph" & return & "PY - 2015" & return & "UR - http:// www.sonnysoftware.com" & return
-end tell
-The pathname should be in POSIX format (no escaped characters).
-The reference metadata should be in RIS format, with each tag on a separate line, beginning with the tag
-TY -
-See the Bookends RIS import filter for which tags to use to indicate which fields the metadata are sorted to.
-You can send Bookends just the metadata, just an attachment, or both. Note that a copy of the attachment will be moved to the Bookends default attachment folder—the original will be left alone.
-
-*/
-
-  /**
-   * Add a reference and/or attachment to a library
-   * @param {Map} data Map of key-value pairs containing the reference data
-   * @return {Promise} A Promise resolving with the numeric id of the newly created reference
-   */
-  addReference: function(data) {
-
-  },
-
 
 };
