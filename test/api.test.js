@@ -123,4 +123,12 @@ describe('Bookends', async function() {
     assert.deepStrictEqual(data,expected);
   });    
 
+  it('should retrieve modification dates', async () => {
+    let allIds = await bookends.getGroupReferenceIds('All');
+    let modDates = await bookends.getModificationDates(allIds);
+    assert.equal(modDates.length, allIds.length);
+    modDates.forEach(date => {
+      if ( ! date instanceof Date ) throw new Error("Invalid date in result");
+    });
+  });   
 });

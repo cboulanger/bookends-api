@@ -33,7 +33,7 @@ function quote(str){
  * Trims the result of an OSA command to the relevant data
  * @param {String} item 
  */
-function trimOsaResult(item) {
+function trimResult(item) {
   return item.substring(1, item.length - 2);
 }
 
@@ -99,7 +99,7 @@ module.exports =
     if ( ! groupName || !util.isString(groupName)){
       throw new Error("Parameter must be a string");
     } 
-    return evalOSA(command('RUID', quote(groupName)), "\r", trimOsaResult)
+    return evalOSA(command('RUID', quote(groupName)), "\r", trimResult)
     .then( result => result.map( item => parseInt(item)) );
   },
 
@@ -113,7 +113,7 @@ module.exports =
     if ( ! search || !util.isString(search)){
       throw new Error("Parameter must be a string");
     } 
-    return evalOSA(command('SQLS', quote(search)), "\r", trimOsaResult)
+    return evalOSA(command('SQLS', quote(search)), "\r", trimResult)
     .then( result => result.map( item => parseInt(item)));
   },
 
@@ -240,22 +240,22 @@ module.exports =
     });
   },
 
-
   /**
    * Returns the dates when the references with the given ids were last modified
    * @param  {Array} ids An array of numeric ids
    * @return {Promise} A Promise resolving with an array of Date objects
    */
   getModificationDates: function(ids) {
-    if (!(ids instanceof Array)) throw new Error("ids must be an array.");
-    var args = ' "' + ids.join(',') + '"';
-    return evalOSA(command('RMOD') + args, String.fromCharCode(0))
-    .then(function(result) {
-      return result.map(function(s) {
+    if ( ! util.isArray(ids) || ids.length < 1 ) {
+      throw new Error("First parameter must be an Array with at least one element");
+    }
+    return evalOSA(command('RMOD', quote(ids.join(',') )), String.fromCharCode(0), trimResult)
+    .then(result => {
+      return result.map(timestamp => {
         return new Date(
           // Need Unix (1970) milliseconds (not 1904 seconds) for JS:
           // (drop 66 years of seconds, and convert to milliseconds)
-          (parseInt(s, 10) - 2.0828448E+9) * 1000
+          (parseInt(timestamp, 10) - 2.0828448E+9) * 1000
         );
       });
     });
