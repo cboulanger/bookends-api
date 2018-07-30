@@ -11,7 +11,8 @@ module.exports = {
     osascript.execute('tell application "Bookends" to quit');
     fs.copyFileSync( bookendsLibraryPath + '.dist', bookendsLibraryPath );
     this.bookendsProcess = spawn(bookendsExecutablePath, [bookendsLibraryPath]);
-    await new Promise(resolve => setTimeout( () => resolve(), 5000));
+    console.log("Waiting for Bookends to start ...");
+    await new Promise(resolve => setTimeout( () => resolve(), 10000));
   }, 
   after: async function() {
     osascript.execute('tell application "Bookends" to quit');

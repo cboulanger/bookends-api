@@ -30,10 +30,10 @@ function quote(str){
 }
 
 /**
- * Trims the result of an OSA command to the relevant data
+ * Trims the result of an OSA call to Bookends, removing the quotes at the beginning/end
  * @param {String} item 
  */
-function trimResult(item) {
+function removeQuotes(item) {
   return item.substring(1, item.length - 2);
 }
 
@@ -41,19 +41,19 @@ function trimResult(item) {
  * Execute a command via OSA and process the result. Returns a Promise
  * that resolves to an array of Strings (splitChar: String|undefined) or a 
  * String (splitChar: false). 
- * @param OSACommand {String}
- * @param splitChar {String|false|undefined}
- *    If string, split the result at the occurrences of this string
- *    If false, split by "\r" and re-join with "\n"
- *    If undefined, split with "\r"
+ * @param {String} cmd
+ * @param {Boolean} debug If true, log diagnostic information to the console
  * @return {Promise}
  */
-function evalOSA(OSACommand, splitChar, transformFunc) {
+function runOsaCmd(cmd, debug=false) {
   return new Promise(function(resolve, reject) {
-    //console.debug(OSACommand);
+    if (debug) console.debug( " >>> OSA Command:" + cmd);
     try {
-      osascript.execute(OSACommand, {},
+      osascript.execute(cmd, {},
         function(err, result, raw) {
+          if (debug) {
+            console.debug( " >>> OSA Result:" + result);
+          }
           if ( util.isString(result) ){
             if ( result.includes("No Bookends library window is open") || result.includes("error") ) {
               err = result;
@@ -62,14 +62,6 @@ function evalOSA(OSACommand, splitChar, transformFunc) {
           // check for errors
           if ( err ) {
             return reject(err);
-          }
-          // transform
-          if (typeof transformFunc == "function") {
-            result = transformFunc(result);
-          }
-          // split unless splitChar is false, trim the array items
-          if (splitChar !== false) {
-            result = result.split(new RegExp(splitChar || "\r")).map(item => item.trim());
           }
           resolve(result);
         }
@@ -181,40 +173,38 @@ module.exports =
 
   /**
    * Get the version number of Bookends
-   * @param  {Array} ids       An array with one or more ids
-   * @param  {String} fieldName The name of the field
    * @return {Promise} A promise that resolves to a String containing the version number
    */
   getVersion : function() {
-    return evalOSA(command('VERS'),false);
+    return runOsaCmd(command('VERS'));
   },
 
   /**
    * Get unique ids of the selected references or references in a group
    * @param  {String} groupName Group name (can be “All”. “Hits”, “Attachments”, “Selection”, or the name of a group you created
-   * @return {Promise}  A promise resovling with an array containing
+   * @return {Promise<Number[]>}  A promise resovling with an array containing
    * the unique IDs as integer values.
    */
   getGroupReferenceIds: function(groupName) {
     if ( ! groupName || !util.isString(groupName)){
       throw new Error("Parameter must be a string");
     } 
-    return evalOSA(command('RUID', quote(groupName)), "\r", trimResult)
-    .then( result => result.map( item => parseInt(item)) );
+    return runOsaCmd(command('RUID', quote(groupName)))
+    .then( result => removeQuotes(result).split(/\r/).map( item => parseInt(item)) );
   },
 
   /**
    * Get unique ids of references found with an SQL search as detailed in the User Guide.
    * @param  {String} search Search parameters as you would enter them using Refs -> SQL/Regex Search
-   * @return {Promise}  A promise resovling with an array containing
+   * @return {Promise<Number[]>}  A promise resovling with an array containing
    * the unique IDs of all found references as integer values.
    */
   searchReferences: function(search) {
     if ( ! search || !util.isString(search)){
       throw new Error("Parameter must be a string");
     } 
-    return evalOSA(command('SQLS', quote(search)), "\r", trimResult)
-    .then( result => result.map( item => parseInt(item)));
+    return runOsaCmd(command('SQLS', quote(search)))
+    .then( result => removeQuotes(result).split(/\r/).map( item => parseInt(item)));
   },
 
   /**
@@ -224,7 +214,7 @@ module.exports =
    * @param {Array} ids 
    * @param {String} format
    * @param {Boolean} asRtf 
-   * @return {Promise}
+   * @return {Promise<String[]>}
    */
   formatReferences: function(ids, format, asRtf=false) {
     if ( ! util.isArray(ids)){
@@ -237,7 +227,8 @@ module.exports =
       quote(ids.join(',')), 
       `given «class RRTF»:"${asRtf?'true':'false'}", string:"${format}"`
     );
-    return evalOSA(cmd, "\r\r", item => item.substring(1, item.length-3));
+    return runOsaCmd(cmd)
+    .then(result => result.substring(1, result.length-3).split(/\r\r/).map(item => item.trim()));
   },
 
   /**
@@ -250,13 +241,13 @@ module.exports =
    *  and groups: "top folder/inner folder/group name". Note that the items will be ordered by group name, 
    *  not the full path, so that zfolder/a comes before afolder/b. If a group name contains a slash (/), 
    *  it will be escaped as //.
-   * @return {Promise}
+   * @return {Promise<String[]>}
    */
   getGroupNames : function(includePath=false) {
     let cmd = command('RGPN',
       `given «class PATH»:"${includePath?'true':'false'}"`
     );
-    return evalOSA(cmd, "\r", item => item.substring(1, item.length-2));
+    return runOsaCmd(cmd).then(result => removeQuotes(result).split(/\r/));
   },
 
   /**
@@ -265,7 +256,7 @@ module.exports =
    * name that is already in use and Bookends appends a number to make it unique.
    * @param {String} groupName 
    * @param {Array|undefined} ids 
-   * @return {Promise}
+   * @return {Promise<String>}
    */
   createStaticGroup : function(groupName, ids=[]) {
     if ( ! groupName || ! util.isString(groupName)) {
@@ -275,7 +266,7 @@ module.exports =
       throw new Error("Second parameter must be an Array");
     } 
     let cmd = command('ADDG', quote(groupName), `given string:"${ids.join(',')}"`);
-    return evalOSA(cmd);    
+    return runOsaCmd(cmd);
   },
 
   /**
@@ -283,7 +274,7 @@ module.exports =
    * Returns a Promise with the number of references added. 
    * @param {String} groupName 
    * @param {Array|undefined} ids 
-   * @return {Promise}
+   * @return {Promise<Number>}
    */
   addToStaticGroup : function(groupName, ids=[]) {
     if ( ! groupName || ! util.isString(groupName)) {
@@ -293,7 +284,7 @@ module.exports =
       throw new Error("Second parameter must be an Array");
     } 
     let cmd = command('ADTG', quote(groupName), `given string:"${ids.join(',')}"`);
-    return evalOSA(cmd);    
+    return runOsaCmd(cmd);
   },
 
   /**
@@ -304,7 +295,7 @@ module.exports =
    * @param {Boolean} convertType 
    *    If true, convert the numeric reference type codess into their string representation
    *    (i.e. 0 => "Journal Article").
-   * @return {Promise}  A promise resolving with to an array of json objects
+   * @return {Promise<Object[]>}  A promise resolving with to an array of json objects
    */
   readReferences : function(ids, fieldNames, convertType=true) {
     if ( ! util.isArray(ids) || ids.length < 1 ) {
@@ -318,7 +309,7 @@ module.exports =
         throw new Error(`Unknown field '${fieldName}'`);
       }
     });
-    return evalOSA(command(
+    return runOsaCmd(command(
       'RJSN', quote(ids.join(',')), 'given string:', quote(fieldNames.join(','))
     ))
     .then(result => {
@@ -337,7 +328,7 @@ module.exports =
    * Given an array of object, update the references that have a matching 'uniqueID'.
    * Reference types are automatically converted into their internal numeric code.
    * @param  {Array} data An array with at least one json object
-   * @return {Promise}
+   * @return {Promise<void>}
    */
   updateReferences : function(data) {
     if ( ! util.isArray(data) ||data.length < 1 ) {
@@ -364,7 +355,7 @@ module.exports =
     } catch (e) {
       throw new Error("Data cannot be serialized to JSON: " + e.message);
     }
-    return evalOSA(command( 'SJSN', quote(json) ), false)
+    return runOsaCmd(command( 'SJSN', quote(json) ))
     .then(result => {
       if ( result === null) return; 
       throw new Error(result);
@@ -374,7 +365,7 @@ module.exports =
   /**
    * Add a reference and/or attachment to a library
    * @param {Map} data Map of key-value pairs containing the reference data
-   * @return {Promise} A Promise resolving with the numeric id of the newly created reference
+   * @return {Promise<Number>} A Promise resolving with the numeric id of the newly created reference
    */
   addReferences: async function(data) {
     if ( ! util.isArray(data) || data.length < 1 ) {
@@ -386,9 +377,9 @@ module.exports =
         throw new Error(`Invalid element ${i}: must be an object with at least the key 'type'`);
       }
       // create entry
-      let result = (await evalOSA(command( 'ADDA', '""', `given «class RIST»:"TY - JOUR\n"` ), false));
+      let result = (await runOsaCmd(command( 'ADDA', '""', `given «class RIST»:"TY - JOUR\n"` ), false));
       item.uniqueID = parseInt(result.trim());
-    };
+    }
     // update values
     return this.updateReferences(data);
   },
@@ -400,18 +391,18 @@ module.exports =
 
   },
 
-    /**
+  /**
    * Returns the dates when the references with the given ids were last modified
    * @param  {Array} ids An array of numeric ids
-   * @return {Promise} A Promise resolving with an array of Date objects
+   * @return {Promise<Date[]>} A Promise resolving with an array of Date objects
    */
   modificationDates: function(ids) {
     if ( ! util.isArray(ids) || ids.length < 1 ) {
       throw new Error("First parameter must be an Array with at least one element");
     }
-    return evalOSA(command('RMOD', quote(ids.join(',') )), String.fromCharCode(0), trimResult)
+    return runOsaCmd(command('RMOD', quote(ids.join(','))))
     .then(result => {
-      return result.map(timestamp => {
+      return removeQuotes(result).split(new RegExp(String.fromCharCode(0))).map(timestamp => {
         return new Date(
           // Need Unix (1970) milliseconds (not 1904 seconds) for JS:
           // (drop 66 years of seconds, and convert to milliseconds)
@@ -419,6 +410,5 @@ module.exports =
         );
       });
     });
-  },
-
+  }
 };
