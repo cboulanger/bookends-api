@@ -1,7 +1,8 @@
 language: node_js
 node_js: "stable"
 
-script: echo "npm test temporarily disabled"
+script: 
+ - npm run jsdoc 
 
 deploy:
   provider: pages
