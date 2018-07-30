@@ -389,13 +389,6 @@ module.exports =
   },
 
   /**
-   * Adds an attachement
-   */
-  addAttachment: function(path) {
-
-  },
-
-  /**
    * Returns the dates when the references with the given ids were last modified
    * @param  {Array} ids An array of numeric ids
    * @return {Promise<Date[]>} A Promise resolving with an array of Date objects

@@ -4,4 +4,4 @@ A NodeJS API client for the Bookenends Reference Manager (http://www.sonnysoftwa
 
 Status: alpha/experimental
 
-- [API Documentation](docs/index.html) 
+- [API Documentation](https://cboulanger.github.io/bookends-api/module-bookends-api.html) 
