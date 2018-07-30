@@ -7,7 +7,8 @@ node_modules/
 .idea
 .c9
 
-# tests
+# documentation and tests
+docs/
 test/Bookends-Apple-Events.pdf
 test/bookends.bdb
 test/bookends.bdb.journal

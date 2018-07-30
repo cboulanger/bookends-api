@@ -72,6 +72,10 @@ function runOsaCmd(cmd, debug=false) {
   });
 }
 
+/**
+ * @module bookends-api
+ * @type {{getTypes: function(): string[], getFields: function(): string[], codeFromType: function(String): number, typeFromCode: function(Number): (*|Number), getVersion: function(): Promise, getGroupReferenceIds: function(String): Promise<number[]>, searchReferences: function(String): Promise<number[]>, formatReferences: function(Array, String, Boolean=): Promise<string[]>, getGroupNames: function(Boolean=): Promise<any>, createStaticGroup: function(String, (Array)=): Promise, addToStaticGroup: function(String, (Array)=): Promise, readReferences: function(Array, Array, Boolean=): Promise<any>, updateReferences: function(Array): Promise<any>, addReferences: function(Map): (*|Promise<void>), addAttachment: module.exports.addAttachment, modificationDates: function(Array): Promise<Date[]>}}
+ */
 module.exports = 
 {
   /**

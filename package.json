@@ -4,7 +4,8 @@
   "description": "A NodeJS client for the Bookends reference manager (http://www.sonnysoftware.com)",
   "main": "index.js",
   "scripts": {
-    "test": "mocha -- test/*.test.js"
+    "test": "mocha -- test/*.test.js",
+    "jsdoc": "jsdoc index.js -d docs"
   },
   "repository": {
     "type": "git",
@@ -25,6 +26,7 @@
     "node-osascript": "^2.0.0"
   },
   "devDependencies": {
+    "jsdoc": "^3.5.5",
     "mocha": "^5.2.0"
   }
 }
