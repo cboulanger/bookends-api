@@ -26,7 +26,10 @@
     "node-osascript": "^2.0.0"
   },
   "devDependencies": {
+    "dotenv": "^6.0.0",
+    "gauge": "^2.7.4",
     "jsdoc": "^3.5.5",
-    "mocha": "^5.2.0"
+    "mocha": "^5.2.0",
+    "zotero": "^0.4.1"
   }
 }

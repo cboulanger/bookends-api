@@ -3,12 +3,15 @@
 npm-debug.log*
 node_modules/
 
+# Environment
+.env
+
 # IDEs
 .idea
 .c9
 
 # documentation and tests
+*.journal
 docs/
-test/Bookends-Apple-Events.pdf
 test/bookends.bdb
-test/bookends.bdb.journal
+example/example.bdb

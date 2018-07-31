@@ -1,7 +1,7 @@
 /* global describe, it, beforeEach, afterEach */
 
-const bookends = require( __dirname + '/../index');
-const fixture = require( __dirname + '/fixture' );
+const bookends = require('../index');
+const fixture = require('./fixture');
 const assert = require('assert');
 const util = require('util');
 

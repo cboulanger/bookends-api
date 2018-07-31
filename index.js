@@ -46,6 +46,8 @@ function removeQuotes(item) {
  * @return {Promise}
  */
 function runOsaCmd(cmd, debug=false) {
+  // error list, must be expanded
+  const errors = ["No Bookends library window is open"];
   return new Promise(function(resolve, reject) {
     if (debug) console.debug( " >>> OSA Command:" + cmd);
     try {
@@ -54,15 +56,9 @@ function runOsaCmd(cmd, debug=false) {
           if (debug) {
             console.debug( " >>> OSA Result:" + result);
           }
-          if ( util.isString(result) ){
-            if ( result.includes("No Bookends library window is open") || result.includes("error") ) {
-              err = result;
-            }
-          }
           // check for errors
-          if ( err ) {
-            return reject(err);
-          }
+          if (util.isString(result) && errors.some(item => result.includes(item))) err = result;
+          if (err) return reject(err);
           resolve(result);
         }
       );
@@ -73,11 +69,9 @@ function runOsaCmd(cmd, debug=false) {
 }
 
 /**
- * @module bookends-api
- * @type {{getTypes: function(): string[], getFields: function(): string[], codeFromType: function(String): number, typeFromCode: function(Number): (*|Number), getVersion: function(): Promise, getGroupReferenceIds: function(String): Promise<number[]>, searchReferences: function(String): Promise<number[]>, formatReferences: function(Array, String, Boolean=): Promise<string[]>, getGroupNames: function(Boolean=): Promise<any>, createStaticGroup: function(String, (Array)=): Promise, addToStaticGroup: function(String, (Array)=): Promise, readReferences: function(Array, Array, Boolean=): Promise<any>, updateReferences: function(Array): Promise<any>, addReferences: function(Map): (*|Promise<void>), addAttachment: module.exports.addAttachment, modificationDates: function(Array): Promise<Date[]>}}
+ * xx@module bookends-api
  */
-module.exports = 
-{
+module.exports = {
   /**
    * The reference types
    * @return {Array}
@@ -144,7 +138,8 @@ module.exports =
       "user19",
       "user20",
       "attachments",
-      "type"
+      "type",
+      "groups"
     ];
   },
 
@@ -221,7 +216,7 @@ module.exports =
    * @return {Promise<String[]>}
    */
   formatReferences: function(ids, format, asRtf=false) {
-    if ( ! util.isArray(ids)){
+    if ( ! Array.isArray(ids)){
       throw new Error("First parameter must be an Array");
     } 
     if ( ! format || ! util.isString(format)){
@@ -266,7 +261,7 @@ module.exports =
     if ( ! groupName || ! util.isString(groupName)) {
       throw new Error("First parameter must be a non-empty String");
     }       
-    if ( ! util.isArray(ids)) {
+    if ( ! Array.isArray(ids)) {
       throw new Error("Second parameter must be an Array");
     } 
     let cmd = command('ADDG', quote(groupName), `given string:"${ids.join(',')}"`);
@@ -284,7 +279,7 @@ module.exports =
     if ( ! groupName || ! util.isString(groupName)) {
       throw new Error("First parameter must be a non-empty String");
     }       
-    if ( ! util.isArray(ids)) {
+    if ( ! Array.isArray(ids)) {
       throw new Error("Second parameter must be an Array");
     } 
     let cmd = command('ADTG', quote(groupName), `given string:"${ids.join(',')}"`);
@@ -302,10 +297,10 @@ module.exports =
    * @return {Promise<Object[]>}  A promise resolving with to an array of json objects
    */
   readReferences : function(ids, fieldNames, convertType=true) {
-    if ( ! util.isArray(ids) || ids.length < 1 ) {
+    if ( ! Array.isArray(ids) || ids.length < 1 ) {
       throw new Error("First parameter must be an Array with at least one element");
     }       
-    if ( ! util.isArray(fieldNames) || fieldNames.length < 1 ) {
+    if ( ! Array.isArray(fieldNames) || fieldNames.length < 1 ) {
       throw new Error("First parameter must be an Array with at least one element");
     }
     fieldNames.forEach( fieldName => {
@@ -335,7 +330,7 @@ module.exports =
    * @return {Promise<void>}
    */
   updateReferences : function(data) {
-    if ( ! util.isArray(data) ||data.length < 1 ) {
+    if ( ! Array.isArray(data) ||data.length < 1 ) {
       throw new Error("First parameter must be an Array with at least one element");
     }
     data = data.map( (item, index) => {
@@ -372,7 +367,7 @@ module.exports =
    * @return {Promise<Number>} A Promise resolving with the numeric id of the newly created reference
    */
   addReferences: async function(data) {
-    if ( ! util.isArray(data) || data.length < 1 ) {
+    if ( ! Array.isArray(data) || data.length < 1 ) {
       throw new Error("Parameter must be an array with at least one element");
     } 
     for ( let i=0; i < data.length; i++) {
@@ -394,7 +389,7 @@ module.exports =
    * @return {Promise<Date[]>} A Promise resolving with an array of Date objects
    */
   modificationDates: function(ids) {
-    if ( ! util.isArray(ids) || ids.length < 1 ) {
+    if ( ! Array.isArray(ids) || ids.length < 1 ) {
       throw new Error("First parameter must be an Array with at least one element");
     }
     return runOsaCmd(command('RMOD', quote(ids.join(','))))
