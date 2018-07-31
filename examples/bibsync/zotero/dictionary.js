@@ -89,7 +89,6 @@ const fields_toLocal =
       return localType || "journalArticle";
     }
   },
-  key: 'key',
   accessDate: 'accessDate',
   abstract: 'abstractNote',
   attachments : "attachments",
@@ -100,14 +99,14 @@ const fields_toLocal =
     translateContent : function(data){
       let creators = data.creators || [];
       data.authors.split(/;/).map(elem => {
-        if( elem.includes(",") ){
+        if( elem.includes(",") && elem.length > 3 ){
           part = elem.split(/,/);
           creators.push({
             creatorType : "author",
             lastName    : part[0].trim(),
             firstName   : part[1].trim()
           });
-        } else {
+        } else if(elem.trim()) {
           creators.push({
             creatorType : "author",
             name        : elem.trim()
@@ -135,14 +134,14 @@ const fields_toLocal =
     translateContent : function(data){
       let creators = data.creators || [];
       data.editors.split(/;/).map(function(elem){
-        if( elem.includes(",") ){
+        if( elem.includes(",") && elem.length > 3){
           part = elem.split(/,/);
           creators.push({
             creatorType : "editor",
             lastName    : part[0].trim(),
             firstName   : part[1].trim()
           });
-        } else {
+        } else if(elem.trim()){
           creators.push({
             creatorType : "editor",
             name        : elem.trim()
@@ -162,9 +161,7 @@ const fields_toLocal =
       return "tags";
     },
     translateContent : function(data){
-      return data.keywords.split(/;/).map(function(elem){
-        return { tag : elem.trim(), type : 1 };
-      });
+      return data.keywords.split(/;/).filter(item => !!item.trim()).map(item => ({tag: item.trim().substr(0,100), type: 1}));
     }
   },
   language: 'language',
@@ -333,7 +330,15 @@ const types_toGlobal = {
  * Map local to global fields
  */
 const fields_toGlobal =
-{ key: 'id',
+{ key: {
+    translateName : function(data) {
+      return false;
+    },
+    translateContent : function(data)
+    {
+      return { 'zotero-key' : data.key};
+    }
+  },
   itemType: {
     translateName : function(data) {
       return 'itemType';

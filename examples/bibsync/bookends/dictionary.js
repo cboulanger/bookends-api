@@ -91,7 +91,6 @@ const fields_toLocal =
       return localType || "Journal article";
     }
   },
-  key: 'user1',
   accessDate: 'user20',
   abstract: 'abstract',
   authors: {
