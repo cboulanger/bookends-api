@@ -11,7 +11,7 @@ const fixture = require('./fixture' );
 const translate = require('./bibsync/translator');
 const util = require('util');
 const Gauge = require('gauge');
-const zotero = require('./bibsync/zotero/zotero-enhanced');
+const zotero = require('./bibsync/zotero/zotero-api-plus');
 
 // dictionary to translate from and to the different field schemas
 let dict = {
