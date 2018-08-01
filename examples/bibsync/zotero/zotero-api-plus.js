@@ -41,8 +41,8 @@ class Item extends EventEmitter {
       if (!message.ok) throw message.error;
       let idsFailed = Object.getOwnPropertyNames(message.data.failed);
       if (idsFailed.length) {
-        let error = new Error("Some or all of the requests failed:");
-        error.failedItems = idsFailed.map(id => [message.data.failed[id].message, JSON.stringify(data[id])]);
+        // add to the list of failed requests for later debugging
+        Item.failedRequests.concat(idsFailed.map(id => [message.data.failed[id].message, JSON.stringify(data[id])]));
         throw error;
       }
       let idsSuccess = Object.getOwnPropertyNames(message.data.success);
@@ -301,7 +301,6 @@ class Attachment extends Item {
         switch (response.statusCode) {
           case 201:
           case 204:
-            console.log("Upload complete");
             return resolve();
           default:
             reject("Http Error " + response.statusCode + ": " + response.headers);
@@ -338,6 +337,7 @@ class Attachment extends Item {
   }
 }
 
+
 /**
  * A queue of items to be sent to the server
  * @type {Item[]}
@@ -352,9 +352,15 @@ Item.templates = {};
 
 /**
  * A list of uploads that still need to complete
- * @type {Attachment[]}
+ * @type {{}}
  */
 Item.pendingUploads = {};
+
+/**
+ * A list of requests that have failed
+ * @type {Array[]}
+ */
+Item.failedRequests = [];
 
 /**
  * Return the current sync version of the library

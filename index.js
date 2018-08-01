@@ -71,7 +71,7 @@ function runOsaCmd(cmd, debug=false) {
 /**
  * xx@module bookends-api
  */
-module.exports = {
+let bookends = {
   /**
    * The reference types
    * @return {Array}
@@ -404,3 +404,5 @@ module.exports = {
     });
   }
 };
+
+module.exports = bookends;

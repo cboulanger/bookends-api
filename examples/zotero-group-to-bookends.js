@@ -1,5 +1,5 @@
 /**
- * Script to copy a Bookends database to a Zotero group
+ * Script to copy a  Zotero group to a Bookends database
  */
 
 // see readme.md first to configure the examples
@@ -22,15 +22,16 @@ let dict = {
 const debug = false;
 const max = 0;
 let i=0;
-let missing_attachments = [];
 
 (async()=>{
   try {
     await fixture.before();
     const gauge = new Gauge();
     const bookends_fields = bookends.getFields();
-    const allIds = await bookends.getGroupReferenceIds('all');
+
+    const allIds = zotero.library.items({format: "versions"});
     gauge.show(`Retrieving ${allIds.length} references ...`, 0);
+
     let bookends_items = await bookends.readReferences(allIds, bookends_fields);
     const total = bookends_items.length;
     for (let bookends_item of bookends_items) {
@@ -71,10 +72,10 @@ let missing_attachments = [];
         await item.save(true);
         i++;
         if (i % 50===0){
-          gauge.show(`Sending data to Zotero server...`, i/total);
+          gauge.show(`Sending data to Zotero server`, i/total);
           await zotero.Item.sendAll();
         }
-        gauge.show(`Saved ${i}/${total} references.`, i/total);
+        gauge.show(`Saved ${i}/${total} references to Zotero`, i/total);
         // this causes a small delay so that the gauge can be seen
         await new Promise(resolve => setTimeout( () => resolve(), 50));
       }
@@ -88,12 +89,7 @@ let missing_attachments = [];
     gauge.hide();
     console.log(`Exported ${total} references to Zotero.`);
     if(missing_attachments.length){
-      console.error("The following attachments were not found and could not be uploaded:\n" +
-        missing_attachments.join("\n - "));
-    }
-    if (Item.failedRequests.length){
-      console.error("The following errors occurred when saving items to the Zotero server:");
-      console.error(Item.failedRequests);
+      console.log("The following attachments were not found and could not be uploaded:\n" + missing_attachments.join("\n - "));
     }
     fixture.after();
   }catch(e){ console.error(e);}

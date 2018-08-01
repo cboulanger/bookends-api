@@ -7,6 +7,8 @@
 const makeCreatorFunc = function(creatorType, field = creatorType+"s") {
   return function(data){
     let creators = [];
+    if (data[field] === undefined) throw new Error(`Invalid creatorType '${creatorType}' or field '${field}'`);
+    if (typeof data[field] !== "string") throw new Error(`Content in field '${field}' must be string`);
     data[field].split(/;/).map(elem => {
       if( elem.includes(",") && elem.length > 3 ){
         part = elem.split(/,/);
@@ -177,7 +179,7 @@ const fields_toLocal =
   title: 'title',
   title2: false,
   titleTranslated: 'titleTranslated',
-  translator: {
+  translators: {
     default: () => [],
     translateName: () => 'creators',
     translateContent: makeCreatorFunc("translator")
@@ -361,7 +363,6 @@ const fields_toGlobal =
       return content;
     }
   },
-  creatorSummary: 'creatorSummary',
   tags: {
     translateName: function(data) {
       return "keywords";
@@ -370,7 +371,6 @@ const fields_toGlobal =
       return data.tags.reduce((result, elem) => (result ? result + "; " :"") + elem.tag);
     }
   },
-  authorTranslated: 'authorTranslated',
   applicationNumber: 'applicationNumber',
   blogTitle: 'blogTitle',
   bookTitle: 'bookTitle',
@@ -407,7 +407,6 @@ const fields_toGlobal =
   firstPage: 'firstPage',
   title: 'title',
   titleTranslated: 'titleTranslated',
-  translator: 'translator',
   url: 'url',
   university: 'university',
   websiteTitle: 'websiteTitle',
