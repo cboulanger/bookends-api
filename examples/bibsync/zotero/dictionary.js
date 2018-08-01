@@ -1,4 +1,32 @@
 /**
+ * Creates a function that exports a flat creator field to the Zotero creator data model
+ * @param {String} creatorType The creatorType
+ * @param {String} field The name of the field in the source dialect, defaults to the creatorType + "s"
+ * @return {function(*): *}
+ */
+const makeCreatorFunc = function(creatorType, field = creatorType+"s") {
+  return function(data){
+    let creators = [];
+    data[field].split(/;/).map(elem => {
+      if( elem.includes(",") && elem.length > 3 ){
+        part = elem.split(/,/);
+        creators.push({
+          creatorType,
+          lastName: part[0].trim(),
+          firstName: part[1].trim()
+        });
+      } else if(elem.trim()) {
+        creators.push({
+          creatorType,
+          name: elem.trim()
+        });
+      }
+    });
+    return creators;
+  }
+};
+
+/**
  * Map global to local types
  */
 const types_toLocal =
@@ -93,28 +121,9 @@ const fields_toLocal =
   abstract: 'abstractNote',
   attachments : "attachments",
   authors: {
-    translateName : function(data) {
-      return 'creators';
-    },
-    translateContent : function(data){
-      let creators = data.creators || [];
-      data.authors.split(/;/).map(elem => {
-        if( elem.includes(",") && elem.length > 3 ){
-          part = elem.split(/,/);
-          creators.push({
-            creatorType : "author",
-            lastName    : part[0].trim(),
-            firstName   : part[1].trim()
-          });
-        } else if(elem.trim()) {
-          creators.push({
-            creatorType : "author",
-            name        : elem.trim()
-          });
-        }
-      });
-      return creators;
-    }
+    default: () => [],
+    translateName: () => 'creators',
+    translateContent: makeCreatorFunc("author")
   },
   authorTranslated: 'authorTranslated',
   applicationNumber: 'applicationNumber',
@@ -128,28 +137,9 @@ const fields_toLocal =
   doi: 'DOI',
   edition: 'edition',
   editors: {
-    translateName   : function(data) {
-      return 'creators';
-    },
-    translateContent : function(data){
-      let creators = data.creators || [];
-      data.editors.split(/;/).map(function(elem){
-        if( elem.includes(",") && elem.length > 3){
-          part = elem.split(/,/);
-          creators.push({
-            creatorType : "editor",
-            lastName    : part[0].trim(),
-            firstName   : part[1].trim()
-          });
-        } else if(elem.trim()){
-          creators.push({
-            creatorType : "editor",
-            name        : elem.trim()
-          });
-        }
-      });
-      return creators;
-    }
+    default: () => [],
+    translateName: () => 'creators',
+    translateContent: makeCreatorFunc("editor")
   },
   issue: 'issue',
   isbn: 'ISBN',
@@ -187,7 +177,11 @@ const fields_toLocal =
   title: 'title',
   title2: false,
   titleTranslated: 'titleTranslated',
-  translator: 'translator',
+  translator: {
+    default: () => [],
+    translateName: () => 'creators',
+    translateContent: makeCreatorFunc("translator")
+  },
   url: 'url',
   university: 'university',
   websiteTitle: 'websiteTitle',
@@ -360,11 +354,8 @@ const fields_toGlobal =
     translateContent: function(data){
       let field, content={};
       data.creators.map(function(elem) {
+        // @todo make this more sophisticated
         const name = elem.name || elem.lastName + ", " + elem.firstName;
-        switch (elem.creatorType) {
-          case "editor": field = "editors"; break;
-          default: field = "authors"; break;
-        }
         content[field] = (content[field]?content[field]+"; ":"")+ name;
       });
       return content;
@@ -404,7 +395,8 @@ const fields_toGlobal =
     translateContent : function(data){
       return data.notes.replace(/<br \/>/g, '\n');
     }
-  }, numberOfVolumes: 'numberOfVolumes',
+  },
+  numberOfVolumes: 'numberOfVolumes',
   numPages: 'numPages',
   originalPublication: 'originalPublication',
   pages: 'pages',

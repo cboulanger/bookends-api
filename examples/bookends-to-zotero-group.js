@@ -19,7 +19,8 @@ let dict = {
   zotero: require('./bibsync/zotero/dictionary')
 };
 
-const debug = false, max = 0;
+const debug = false;
+const max = 0;
 let i=0;
 
 (async()=>{
@@ -49,9 +50,20 @@ let i=0;
       } else {
         let item = new zotero.Item(zotero_item.itemType);
         await item.set(zotero_item);
+        // notes
+        if (zotero_item.notes) {
+          let note = new zotero.Note(zotero_item.notes, item);
+
+          note.save(true);
+        }
+        if (zotero_item.attachments) {
+          let path = process.env.BOOKENDS_ATTACHMENT_PATH + "/" + zotero_item.attachments;
+
+        }
         await item.save(true);
+
         i++;
-        if (i % 50===0 || i === total){
+        if (i % 50===0){
           gauge.show(`Sending data to Zotero server`, i/total);
           await zotero.Item.sendAll();
         }
@@ -60,6 +72,9 @@ let i=0;
         await new Promise(resolve => setTimeout( () => resolve(), 50));
       }
     }
+    gauge.show(`Sending remaining items data to Zotero server ...`);
+    await zotero.Item.sendAll();
+    gauge.hide();
     console.log(`Exported ${total} references to Zotero.`);
     fixture.after();
   }catch(e){ console.error(e);}
