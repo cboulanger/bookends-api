@@ -43,7 +43,6 @@ class Item extends EventEmitter {
       if (idsFailed.length) {
         // add to the list of failed requests for later debugging
         Item.failedRequests.concat(idsFailed.map(id => [message.data.failed[id].message, JSON.stringify(data[id])]));
-        throw error;
       }
       let idsSuccess = Object.getOwnPropertyNames(message.data.success);
       let queueCopy = [].concat(Item.queue);

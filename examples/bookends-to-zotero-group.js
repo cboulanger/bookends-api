@@ -69,14 +69,14 @@ let missing_attachments = [];
           });
         }
         await item.save(true);
-        i++;
+        gauge.show(`Saved ${i}/${total} references.`, i/total);
+        // this causes a small delay so that the gauge can be seen
+        await new Promise(resolve => setTimeout( () => resolve(), 50));
+        // send saved items to server in batches of 50
         if (i % 50===0){
           gauge.show(`Sending data to Zotero server...`, i/total);
           await zotero.Item.sendAll();
         }
-        gauge.show(`Saved ${i}/${total} references.`, i/total);
-        // this causes a small delay so that the gauge can be seen
-        await new Promise(resolve => setTimeout( () => resolve(), 50));
       }
     }
     gauge.show(`Sending remaining items data to Zotero server ...`);
@@ -91,7 +91,7 @@ let missing_attachments = [];
       console.error("The following attachments were not found and could not be uploaded:\n" +
         missing_attachments.join("\n - "));
     }
-    if (Item.failedRequests.length){
+    if (zotero.Item.failedRequests.length){
       console.error("The following errors occurred when saving items to the Zotero server:");
       console.error(Item.failedRequests);
     }

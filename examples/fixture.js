@@ -8,7 +8,7 @@ const process = require('process');
 
 module.exports = {
   before : async function() {
-    return;
+    //return;
     osascript.execute('tell application "Bookends" to quit');
     fs.copyFileSync( __dirname + '/example.dist.bdb', __dirname + '/example.bdb' );
     this.bookendsProcess = spawn(bookendsExecutablePath, [__dirname + '/example.bdb' ]);
@@ -16,7 +16,7 @@ module.exports = {
     await new Promise(resolve => setTimeout( () => resolve(), 5000));
   }, 
   after: async function() {
-    return;
+    //return;
     osascript.execute('tell application "Bookends" to quit');
   }
 };  
