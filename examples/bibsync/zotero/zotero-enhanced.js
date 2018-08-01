@@ -1,7 +1,13 @@
-const zotero = require('zotero');
+const path = require('path');
+const fs = require('fs');
+const process = require('process');
 const util = require('util');
 const crypto = require('crypto');
 const EventEmitter = require('events');
+
+const zotero = require('zotero');
+const request = require("request");
+
 zotero.promisify(util.promisify.bind(Promise));
 
 const library = new zotero.Library({ group: process.env.ZOTERO_GROUP_ID, key: process.env.ZOTERO_API_KEY });
@@ -18,7 +24,7 @@ class Item extends EventEmitter {
   static async sendAll(){
     let keyList = {};
     while (Item.queue.length) {
-      let version = await library.getVersion();
+      //let version = await library.getVersion();
       let data = Item.queue.map(item => {
         //This should work, but doesn't
         //if (!item.data.key) item.data.version = 0;
@@ -29,8 +35,8 @@ class Item extends EventEmitter {
       /* path */    library.path('items'),
       /* options */ {key: library.key},
       /* items */   data,
-      // /* headers */ { 'Zotero-Write-Token': Item.createWriteToken() }
-      /* headers */ {'If-Unmodified-Since-Version': version}
+      /* headers */ { 'Zotero-Write-Token': Item.createWriteToken() }
+      //* headers */ {'If-Unmodified-Since-Version': version}
       );
       if (!message.ok) throw message.error;
       let idsFailed = Object.getOwnPropertyNames(message.data.failed);
@@ -63,6 +69,24 @@ class Item extends EventEmitter {
    */
   static createWriteToken(){
     return crypto.createHash('sha1').update(""+(new Date).getTime()+Math.random()).digest('hex').substr(0,32);
+  }
+
+  /**
+   * Returns true if there are still uploads going on
+   * @return {boolean}
+   */
+  static hasPendingUploads() {
+    return Object.getOwnPropertyNames(this.pendingUploads).length > 0;
+  }
+
+  /**
+   * Returns a promise that resolves when all uploads are completed
+   * @return {Promise<void>}
+   */
+  static async waitForPendingUploads() {
+    while (this.hasPendingUploads()){
+      await new Promise(resolve => setTimeout( () => resolve(), 1000));
+    }
   }
 
   /**
@@ -116,7 +140,7 @@ class Item extends EventEmitter {
     if( Item.templates[itemType] === undefined) {
       Item.templates[itemType] = await this.downloadTemplate(itemType);
     }
-    this.data = Object.assign(this.data, Item.templates[itemType]);
+    this.data = Object.assign({}, Item.templates[itemType], this.data);
     this.isInitialized = true;
   }
 
@@ -194,12 +218,34 @@ class Note extends Item {
 
 class Attachment extends Item {
 
-  constructor() {
+  constructor(filepath, linkMode, parent) {
     super('attachment');
-    /**
-     * its link mode
-     */
-    this.linkMode = linkMode;
+    this.setLinkMode(linkMode);
+    if(parent) this.setParent(parent);
+    this.setFilepath(filepath);
+  }
+
+
+  /**
+   * Setter for linkMode
+   * @param linkMode
+   */
+  setLinkMode(linkMode) {
+    const allowed_linkModes = "imported_file,imported_url,linked_file,linked_url".split(/,/);
+    if (! allowed_linkModes.includes(linkMode) ) throw new Error("Invalid Argument, must be one of " + allowed_linkModes.join(", "));
+    this.data.linkMode = linkMode;
+  }
+
+  /**
+   *
+   * @param {String} filepath
+   */
+  setFilepath(filepath) {
+    if ( !filepath || ! typeof filepath === "string" || !fs.existsSync(filepath)) throw new Error(`File '${filepath}' is invalid or does not exist.`);
+    this.filepath = filepath;
+    let filename = path.basename(filepath);
+    this.data.filename = filename;
+    this.data.title = filename;
   }
 
   /**
@@ -207,20 +253,94 @@ class Attachment extends Item {
    * @return {Promise<void>}
    */
   async downloadTemplate(itemType){
-    if (!this.linkMode) throw new Error("You have to set the linkMode first");
-    return (await library.client.get(`/items/new?itemType=${itemType}&linkMode=${this.linkMode}`)).data;
+    if (!this.data.linkMode) throw new Error("You have to set the linkMode first");
+    return (await library.client.get(`/items/new?itemType=${itemType}&linkMode=${this.data.linkMode}`)).data;
   }
 
-  setLinkMode(linkMode) {
-    if ( this.data.itemType !== "attachment" ) throw new Error("Item is not an attachment");
-    if ( ! "imported_file,imported_url,linked_file,linked_url".split(/,/).includes(linkMode) ) throw new Error("Invalid Argument");
-  }
+  async upload() {
+    if (!this.saved) {
+      this.on("saved", () => this.upload());
+      return;
+    }
+    Item.pendingUploads[this.data.key] = this;
 
+    let fileStat = fs.statSync(this.filepath);
+    let md5hash = require('md5-file').sync(this.filepath);
+    let filename =  path.basename(this.filepath);
+    let body = `md5=${md5hash}&filename=${filename}&filesize=${fileStat.size}&mtime=${fileStat.mtime.getTime()}`;
+
+    let message = await library.client.post(
+      library.path(`items/${this.data.key}/file`),
+      {key: library.key},
+      body,
+      { 'Content-Type': 'application/x-www-form-urlencoded',
+        'If-None-Match': "*"
+      }
+    );
+    let uploadConfig = message.data;
+    if ( uploadConfig.exists ) {
+      // File already uploaded
+      delete Item.pendingUploads[this.data.key];
+      return false;
+    }
+
+    // Create WriteStream
+    let uploadSize = fileStat.size + uploadConfig.prefix.length + uploadConfig.suffix.length;
+    let options = {
+      url : uploadConfig.url,
+      headers : {
+        "Content-Type"   : uploadConfig.contentType,
+        "Content-Length" : uploadSize
+      }
+    };
+    let bytes = 0;
+    await new Promise((resolve, reject) => {
+      let writeStream = request.post(options)
+      .on("error", reject)
+      .on('response', function (response) {
+        switch (response.statusCode) {
+          case 201:
+          case 204:
+            console.log("Upload complete");
+            return resolve();
+          default:
+            reject("Http Error " + response.statusCode + ": " + response.headers);
+        }
+      });
+      // Create ReadStream and pipe into WriteStream
+      const multiStream = require('multistream');
+      const intoStream = require('into-stream');
+      let streams = [
+        intoStream(uploadConfig.prefix),
+        fs.createReadStream(this.filepath),
+        intoStream(uploadConfig.suffix)
+      ];
+      multiStream(streams)
+      .on("error", reject)
+      .on("data", (chunk) => {
+        bytes += chunk.length;
+        console.debug("Sent " +  bytes + " of " + uploadSize + " bytes of data.");
+      })
+      .pipe(writeStream);
+    });
+
+    //console.log("Registering upload...");
+    message = await library.client.post(
+      library.path(`items/${this.data.key}/file`),
+      {key: library.key},
+      `upload=${uploadConfig.uploadKey}`,
+      {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'If-None-Match': "*"
+      }
+    );
+    delete Item.pendingUploads[this.data.key];
+  }
 }
 
 /**
  * A queue of items to be sent to the server
- * @type {Array}
+ * @type {Item[]}
  */
 Item.queue = [];
 
@@ -229,6 +349,12 @@ Item.queue = [];
  * @type {{}}
  */
 Item.templates = {};
+
+/**
+ * A list of uploads that still need to complete
+ * @type {Attachment[]}
+ */
+Item.pendingUploads = {};
 
 /**
  * Return the current sync version of the library

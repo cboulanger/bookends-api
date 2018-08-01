@@ -22,6 +22,7 @@ let dict = {
 const debug = false;
 const max = 0;
 let i=0;
+let missing_attachments = [];
 
 (async()=>{
   try {
@@ -39,7 +40,7 @@ let i=0;
         zotero_item.creators = [{ name: "Anonymous", creatorType: "author"}];
       }
       i++;
-      if( max && i>max) break;
+      if( max && i > max) break;
       if (debug ) {
         //console.log(` >>> Bookends item:`);
         //console.log(bookends_item);
@@ -53,15 +54,21 @@ let i=0;
         // notes
         if (zotero_item.notes) {
           let note = new zotero.Note(zotero_item.notes, item);
-
-          note.save(true);
+          note.save(true);// this is async, doesn't block
         }
         if (zotero_item.attachments) {
-          let path = process.env.BOOKENDS_ATTACHMENT_PATH + "/" + zotero_item.attachments;
-
+          zotero_item.attachments.split(/;/).forEach(filename => {
+            let filepath = process.env.BOOKENDS_ATTACHMENT_PATH + "/" + filename.trim();
+            try {
+              let attachment = new zotero.Attachment(filepath, "imported_file", item);
+              attachment.save(true); // async
+              attachment.upload(); // async, will upload when it is saved
+            } catch (e) {
+              missing_attachments.push(filename);
+            }
+          });
         }
         await item.save(true);
-
         i++;
         if (i % 50===0){
           gauge.show(`Sending data to Zotero server`, i/total);
@@ -74,8 +81,15 @@ let i=0;
     }
     gauge.show(`Sending remaining items data to Zotero server ...`);
     await zotero.Item.sendAll();
+    if (zotero.Item.hasPendingUploads()){
+      gauge.show(`Waiting for pending uploads ...`);
+      await zotero.Item.waitForPendingUploads();
+    }
     gauge.hide();
     console.log(`Exported ${total} references to Zotero.`);
+    if(missing_attachments.length){
+      console.log("The following attachments were not found and could not be uploaded:\n" + missing_attachments.join("\n - "));
+    }
     fixture.after();
   }catch(e){ console.error(e);}
 })();

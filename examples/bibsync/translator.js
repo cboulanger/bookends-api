@@ -141,7 +141,11 @@ class Translator
     if (typeof map[field] === "string" || map[field] === false) {
       return map[field];
     }
-    throw new Error(`Invalid value of field definition for '${field}'`);
+
+    // if not defined no translation
+    if (map[field]===undefined) return false;
+
+    throw new Error(`Invalid field definition for '${field}'`);
   }
 
   /**

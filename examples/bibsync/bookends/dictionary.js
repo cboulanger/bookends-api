@@ -84,7 +84,7 @@ const fields_toLocal =
     },
     translateContent: function (data) {
       let localType = types_toLocal[data.itemType];
-      if (typeof localType == "function") {
+      if (typeof localType === "function") {
         localType = localType(data);
       }
       //console.log("Type:" + data.itemType + " -> " + localType);
@@ -358,7 +358,7 @@ const fields_toGlobal = {
   user10: false,
   user3: 'translator',
   url: 'url',
-  //user4: 'custom1',
+  user4: false,
   user8: false,
   user14: false,
   user15: false,

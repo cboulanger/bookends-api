@@ -28,8 +28,12 @@
   "devDependencies": {
     "dotenv": "^6.0.0",
     "gauge": "^2.7.4",
+    "into-stream": "^3.1.0",
     "jsdoc": "^3.5.5",
+    "md5-file": "^4.0.0",
     "mocha": "^5.2.0",
+    "multistream": "^2.1.1",
+    "request": "^2.87.0",
     "zotero": "^0.4.1"
   }
 }
