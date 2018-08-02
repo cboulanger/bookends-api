@@ -1,5 +1,7 @@
 const util = require('util');
 
+ // @todo Store "extra" data in note, not "extra" field
+
 /**
  * Translates a reference, using dictionaries of "local dialects" and a global exchange format (yet to be fixed & specified)
  */
@@ -56,7 +58,7 @@ class Translator
             this.append( translated_item.extra, key, translated_content[key]);
           }
         });
-      } else {
+      } else if (! (field.startsWith("user") || field.startsWith('default'))){ // @todo make this configurable
         // otherwise, store content in 'extra' field
         this.append( translated_item.extra, field, translated_content || item[field]);
       }

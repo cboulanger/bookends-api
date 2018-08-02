@@ -229,12 +229,12 @@ const fields_toLocal =
   presentationType: false,
   versionNumber: false,
   websiteType: false,
-  custom1: 'user4',
-  custom2: 'user8',
-  custom3: 'user14',
-  custom4: 'user15',
-  custom5: 'user16',
-  custom6: 'user19',
+  // custom1: 'user4',
+  // custom2: 'user8',
+  // custom3: 'user14',
+  // custom4: 'user15',
+  // custom5: 'user16',
+  // custom6: 'user19',
   version: 'user20'
 };
 
@@ -361,7 +361,7 @@ const fields_toGlobal = {
   user4: false,
   user8: false,
   user14: false,
-  user15: false,
+  user15: false, // used for last-sync-date
   user16: false,
   user19: false,
   volume: {

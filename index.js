@@ -49,7 +49,7 @@ function runOsaCmd(cmd, debug=false) {
   // error list, must be expanded
   const errors = ["No Bookends library window is open"];
   return new Promise(function(resolve, reject) {
-    if (debug) console.debug( " >>> OSA Command:" + cmd);
+    if (debug) console.log( " >>> OSA Command:" + cmd);
     try {
       osascript.execute(cmd, {},
         function(err, result, raw) {
@@ -58,11 +58,15 @@ function runOsaCmd(cmd, debug=false) {
           }
           // check for errors
           if (util.isString(result) && errors.some(item => result.includes(item))) err = result;
-          if (err) return reject(err);
+          if (err) {
+            if (debug) console.log(` >>> Error returned by callback of osascript.execute():${err}`);
+            return reject(err);
+          }
           resolve(result);
         }
       );
     } catch (e) {
+      if (debug) console.log(` >>> Error calling osascript.execute():${e.message}`);
       reject(e);
     }
   });
@@ -104,6 +108,7 @@ let bookends = {
    */
   getFields: function() {
     return [
+      "uniqueID",
       "authors",
       "title",
       "editors",
@@ -334,7 +339,7 @@ let bookends = {
       throw new Error("First parameter must be an Array with at least one element");
     }
     data = data.map( (item, index) => {
-      if ( ! util.isNumber(item.type) ) {
+      if ( item.type !== undefined && ! typeof item.type === "number" ) {
         let code  = this.codeFromType(item.type);
         if( code === -1 ) {
           throw new Error(`Invalid reference type '${item.type}' in reference ${index}.`);
@@ -347,6 +352,7 @@ let bookends = {
           throw new Error(`Unknown field '${fieldName}'`);
         }
       });
+      return item;
     });
     let json;       
     try{
@@ -357,7 +363,7 @@ let bookends = {
     return runOsaCmd(command( 'SJSN', quote(json) ))
     .then(result => {
       if ( result === null) return; 
-      throw new Error(result);
+      throw new Error( "updateReferences failed:" + result);
     });
   },
 
@@ -386,7 +392,8 @@ let bookends = {
   /**
    * Returns the dates when the references with the given ids were last modified
    * @param  {Array} ids An array of numeric ids
-   * @return {Promise<Date[]>} A Promise resolving with an array of Date objects
+   * @return {Promise<Date[]>} A Promise resolving with an array of Date objects (UTC timezone), in the
+   * order of the given array of ids.
    */
   modificationDates: function(ids) {
     if ( ! Array.isArray(ids) || ids.length < 1 ) {
@@ -395,11 +402,12 @@ let bookends = {
     return runOsaCmd(command('RMOD', quote(ids.join(','))))
     .then(result => {
       return removeQuotes(result).split(new RegExp(String.fromCharCode(0))).map(timestamp => {
-        return new Date(
-          // Need Unix (1970) milliseconds (not 1904 seconds) for JS:
-          // (drop 66 years of seconds, and convert to milliseconds)
-          (parseInt(timestamp, 10) - 2.0828448E+9) * 1000
-        );
+        // Need Unix (1970) milliseconds (not seconds since 1904) for JS:
+        // (drop 66 years of seconds, and convert to milliseconds)
+        let localDate = new Date((parseInt(timestamp, 10) - 2.0828448E+9) * 1000);
+        // convert into UTC date
+        let utc = new Date(localDate.getTime() + localDate.getTimezoneOffset() * 60000);
+        return utc;
       });
     });
   }

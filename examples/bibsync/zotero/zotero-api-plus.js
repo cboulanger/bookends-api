@@ -14,6 +14,7 @@ const library = new zotero.Library({ group: process.env.ZOTERO_GROUP_ID, key: pr
 
 /**
  * A model of a Zotero item
+ * @todo move static methods to new Items class
  */
 class Item extends EventEmitter {
 
@@ -54,6 +55,7 @@ class Item extends EventEmitter {
         item.data.key = message.data.success[id];
         item.data.version = message.version;
         item.saved = true;
+        this.synchronized.push(item);
         item.emit("saved", message.data.success[id]);
       });
       Object.assign(keyList, message.data.success);
@@ -61,6 +63,24 @@ class Item extends EventEmitter {
     // return the list of keys
     return keyList;
   }
+
+  /**
+   * Resets all queues and caches
+   */
+  static reset() {
+    this.queue = [];
+    this.failedRequests = [];
+    this.synchronized = [];
+    this.pendingUploads = {};
+  }
+
+  /**
+   * Return the current sync versions of all items in the library
+   * @return {Promise<Number>}
+   */
+  static async getVersions(){
+    return (await library.client.get(library.path('items'),{ key:library.key, format: "versions" })).data;
+  };
 
   /**
    * Create a random 32-character string which is used to make unversioned write requests
@@ -120,7 +140,7 @@ class Item extends EventEmitter {
      * The item data
      * @type {{}}
      */
-    this.data = { itemType };
+    this.data = { itemType, version: null, key: null };
 
     /**
      * The parent of this item, if any
@@ -262,68 +282,68 @@ class Attachment extends Item {
       return;
     }
     Item.pendingUploads[this.data.key] = this;
-
-    let fileStat = fs.statSync(this.filepath);
-    let md5hash = require('md5-file').sync(this.filepath);
     let filename =  path.basename(this.filepath);
-    let body = `md5=${md5hash}&filename=${filename}&filesize=${fileStat.size}&mtime=${fileStat.mtime.getTime()}`;
+    try {
+      let fileStat = fs.statSync(this.filepath);
+      let md5hash = require('md5-file').sync(this.filepath);
+      let body = `md5=${md5hash}&filename=${filename}&filesize=${fileStat.size}&mtime=${fileStat.mtime.getTime()}`;
 
-    let message = await library.client.post(
+      let message = await library.client.post(
       library.path(`items/${this.data.key}/file`),
       {key: library.key},
       body,
       { 'Content-Type': 'application/x-www-form-urlencoded',
         'If-None-Match': "*"
       }
-    );
-    let uploadConfig = message.data;
-    if ( uploadConfig.exists ) {
-      // File already uploaded
-      delete Item.pendingUploads[this.data.key];
-      return false;
-    }
-
-    // Create WriteStream
-    let uploadSize = fileStat.size + uploadConfig.prefix.length + uploadConfig.suffix.length;
-    let options = {
-      url : uploadConfig.url,
-      headers : {
-        "Content-Type"   : uploadConfig.contentType,
-        "Content-Length" : uploadSize
+      );
+      let uploadConfig = message.data;
+      if ( uploadConfig.exists ) {
+        // File already uploaded
+        delete Item.pendingUploads[this.data.key];
+        return false;
       }
-    };
-    let bytes = 0;
-    await new Promise((resolve, reject) => {
-      let writeStream = request.post(options)
-      .on("error", reject)
-      .on('response', function (response) {
-        switch (response.statusCode) {
-          case 201:
-          case 204:
-            return resolve();
-          default:
-            reject("Http Error " + response.statusCode + ": " + response.headers);
-        }
-      });
-      // Create ReadStream and pipe into WriteStream
-      const multiStream = require('multistream');
-      const intoStream = require('into-stream');
-      let streams = [
-        intoStream(uploadConfig.prefix),
-        fs.createReadStream(this.filepath),
-        intoStream(uploadConfig.suffix)
-      ];
-      multiStream(streams)
-      .on("error", reject)
-      .on("data", (chunk) => {
-        bytes += chunk.length;
-        console.debug("Sent " +  bytes + " of " + uploadSize + " bytes of data.");
-      })
-      .pipe(writeStream);
-    });
 
-    //console.log("Registering upload...");
-    message = await library.client.post(
+      // Create WriteStream
+      let uploadSize = fileStat.size + uploadConfig.prefix.length + uploadConfig.suffix.length;
+      let options = {
+        url : uploadConfig.url,
+        headers : {
+          "Content-Type"   : uploadConfig.contentType,
+          "Content-Length" : uploadSize
+        }
+      };
+      let bytes = 0;
+      await new Promise((resolve, reject) => {
+        let writeStream = request.post(options)
+        .on("error", reject)
+        .on('response', function (response) {
+          switch (response.statusCode) {
+            case 201:
+            case 204:
+              return resolve();
+            default:
+              reject("Http Error " + response.statusCode + ": " + response.headers);
+          }
+        });
+        // Create ReadStream and pipe into WriteStream
+        const multiStream = require('multistream');
+        const intoStream = require('into-stream');
+        let streams = [
+          intoStream(uploadConfig.prefix),
+          fs.createReadStream(this.filepath),
+          intoStream(uploadConfig.suffix)
+        ];
+        multiStream(streams)
+        .on("error", reject)
+        .on("data", (chunk) => {
+          bytes += chunk.length;
+          console.debug("Sent " +  bytes + " of " + uploadSize + " bytes of data.");
+        })
+        .pipe(writeStream);
+      });
+
+      //console.log("Registering upload...");
+      message = await library.client.post(
       library.path(`items/${this.data.key}/file`),
       {key: library.key},
       `upload=${uploadConfig.uploadKey}`,
@@ -331,7 +351,10 @@ class Attachment extends Item {
         'Content-Type': 'application/x-www-form-urlencoded',
         'If-None-Match': "*"
       }
-    );
+      );
+    } catch (e) {
+      Item.failedRequests.push([e.message, filename ]);
+    }
     delete Item.pendingUploads[this.data.key];
   }
 }
@@ -356,6 +379,12 @@ Item.templates = {};
 Item.pendingUploads = {};
 
 /**
+ * A list of items that have been successfully synchronized
+ * @type {Item[]}
+ */
+Item.synchronized = [];
+
+/**
  * A list of requests that have failed
  * @type {Array[]}
  */
@@ -369,5 +398,6 @@ Item.failedRequests = [];
 library.getVersion = async function(){
   return (await library.client.get(library.path('collections/top'),{ key:library.key, format: "versions" })).version;
 };
+
 
 module.exports = { library, Item, Note, Attachment };
