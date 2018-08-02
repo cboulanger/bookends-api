@@ -23,45 +23,60 @@ class Item extends EventEmitter {
    * @return {*}
    */
   static async sendAll(){
-    let keyList = {};
-    while (Item.queue.length) {
-      //let version = await library.getVersion();
-      let data = Item.queue.map(item => {
+    let sentItems = [];
+    while (this.queue.length) {
+      let version = await library.getVersion();
+      let data = this.queue.map(item => {
         //This should work, but doesn't
         //if (!item.data.key) item.data.version = 0;
         return item.data;
       });
+
       // send to server
       let message = await library.client.post(
-      /* path */    library.path('items'),
-      /* options */ {key: library.key},
-      /* items */   data,
-      /* headers */ { 'Zotero-Write-Token': Item.createWriteToken() }
-      //* headers */ {'If-Unmodified-Since-Version': version}
+        library.path('items'),
+        {key: library.key},
+        data,
+        {
+          'Zotero-Write-Token': this.createWriteToken(),
+          'If-Unmodified-Since-Version': version
+        }
       );
+
+      // save version
+      this.version = message.version;
+
+      // errors
       if (!message.ok) throw message.error;
-      let idsFailed = Object.getOwnPropertyNames(message.data.failed);
+      let idsFailed = Object.getOwnPropertyNames(message.data.failed || {});
       if (idsFailed.length) {
         // add to the list of failed requests for later debugging
-        Item.failedRequests.concat(idsFailed.map(id => [message.data.failed[id].message, JSON.stringify(data[id])]));
+        this.failedRequests = this.failedRequests.concat(
+          idsFailed.map(id => [
+            message.data.failed[id].message,
+            message.data.failed[id].code,
+            JSON.stringify(data[id])
+          ])
+        );
       }
       let idsSuccess = Object.getOwnPropertyNames(message.data.success);
-      let queueCopy = [].concat(Item.queue);
+      let queueCopy = [].concat(this.queue);
       // empty queue
-      Item.queue = [];
+      this.queue = [];
       // add server data to items and emit events
       idsSuccess.forEach(id => {
         let item = queueCopy[id];
         item.data.key = message.data.success[id];
         item.data.version = message.version;
         item.saved = true;
+        sentItems.push(item);
         this.synchronized.push(item);
         item.emit("saved", message.data.success[id]);
       });
-      Object.assign(keyList, message.data.success);
     } // end while
-    // return the list of keys
-    return keyList;
+
+    // return all successfully sent items
+    return sentItems;
   }
 
   /**
@@ -76,10 +91,24 @@ class Item extends EventEmitter {
 
   /**
    * Return the current sync versions of all items in the library
-   * @return {Promise<Number>}
+   * @return {Promise<{}>}
    */
   static async getVersions(){
     return (await library.client.get(library.path('items'),{ key:library.key, format: "versions" })).data;
+  };
+
+  /**
+   * Return the data of all items modified since a given version.
+   * GET <userOrGroupPrefix>/items?since=<last items version>&format=versions
+   * If-Modified-Since-Version: <current local library version>
+   * @return {Promise<String[]>}
+   */
+  static async getItemDataModifiedSinceVersion(version){
+    return Object.getOwnPropertyNames((await library.client.get(
+      library.path('items'),
+      { key:library.key, since: version },
+      { 'If-Modified-Since-Version': version }
+    )).data);
   };
 
   /**
@@ -201,8 +230,8 @@ class Item extends EventEmitter {
    * @param asBatch
    *    If true (defaults to false), do not send right away, but put on a queue to
    *    send in a batch by calling Item.saveAll()
-   * @return {Promise<String|null>}
-   *    The Promise resolves to the item key if asBatch is false or null asBatch is true or if the item has a parent
+   * @return {Promise<Item|null>}
+   *    The Promise resolves to the sent Item if asBatch is false, or null if asBatch is true or if the item has a parent
    *    that needs to be saved to the server first.
    */
   async save(asBatch=false){
@@ -359,6 +388,11 @@ class Attachment extends Item {
   }
 }
 
+/**
+ * Version of the library. Will be updated on each saveAll() call.
+ * @type {number}
+ */
+Item.version = 0;
 
 /**
  * A queue of items to be sent to the server

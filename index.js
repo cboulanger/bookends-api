@@ -314,13 +314,20 @@ let bookends = {
       }
     });
     return runOsaCmd(command(
-      'RJSN', quote(ids.join(',')), 'given string:', quote(fieldNames.join(','))
+      'RJSN', quote(ids.filter(id => !!id).join(',')), 'given string:', quote(fieldNames.join(','))
     ))
     .then(result => {
-      let refs = JSON.parse(result);
+      let refs;
+      try {
+        refs = JSON.parse(result);
+      } catch (e) {
+        throw new Error(result);
+      }
       if( convertType ) {
         refs = refs.map( item => {
-          item.type = this.typeFromCode(item.type);
+          if( typeof item.type === "number") {
+            item.type = this.typeFromCode(item.type);
+          }
           return item; 
         });
       }
