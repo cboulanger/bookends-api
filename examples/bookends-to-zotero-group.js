@@ -45,7 +45,7 @@ class BookendsZoteroSynchronizer {
 
     this.gauge.show(`Getting information on Bookends and Zotero items...`, 0);
 
-    await this.init();
+    await this.prepareSyncData();
 
     // Bookends
     if (this.modifiedIds.length) {
@@ -72,7 +72,7 @@ class BookendsZoteroSynchronizer {
 
     // Problems
     if (this.missing_attachments.length){
-      console.error("The following attachments were not found and could not be uploaded:\n" +
+      console.error("The following attachments were not found and could not be uploaded:\n - " +
       this.missing_attachments.join("\n - "));
     }
     if (zotero.Item.failedRequests.length){
@@ -87,7 +87,7 @@ class BookendsZoteroSynchronizer {
     fixture.after();
   }
 
-  async init(){
+  async prepareSyncData(){
     this.ids = await bookends.getGroupReferenceIds(groupName);
     this.modificationDates = await bookends.modificationDates(this.ids);
     this.syncData = await bookends.readReferences(this.ids, ['uniqueID',BOOKENDS_SYNCDATA_FIELD], false);
@@ -118,9 +118,13 @@ class BookendsZoteroSynchronizer {
           syncTime, version, key
         };
 
-        // if sync time and modification time differ by no more than one second, assume unmodified
-        console.log([new Date(modTime).toUTCString(),new Date(syncTime).toUTCString()]);
-        if (modTime - syncTime < 1000  ) {
+        // if modification time (which will be the  time when the sync data is saved to the reference)
+        // is not later than 100 seconds since the synchronization time, consider unmodified.
+        // This long time lag is necessary because of asynchronicity of saving the timestamp in the bookends database
+
+        //console.log([new Date(modTime).toUTCString(),new Date(syncTime).toUTCString()]);
+        //console.log(modTime - syncTime);
+        if (modTime - syncTime < 100000  ) {
           this.unmodified++;
           return;
         }

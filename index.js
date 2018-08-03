@@ -43,7 +43,7 @@ function removeQuotes(item) {
  * String (splitChar: false). 
  * @param {String} cmd
  * @param {Boolean} debug If true, log diagnostic information to the console
- * @return {Promise}
+ * @return {Promise<*>}
  */
 function runOsaCmd(cmd, debug=false) {
   // error list, must be expanded
@@ -55,6 +55,10 @@ function runOsaCmd(cmd, debug=false) {
         function(err, result, raw) {
           if (debug) {
             console.debug( " >>> OSA Result:" + result);
+          }
+          // normalize
+          if (typeof result === "string") {
+            result = result.normalize("NFC");
           }
           // check for errors
           if (util.isString(result) && errors.some(item => result.includes(item))) err = result;
@@ -157,13 +161,17 @@ let bookends = {
     if ( ! type || !util.isString(type)){
       throw new Error("Parameter must be a string");
     } 
-    return this.getTypes().findIndex(item => type == item);
+    let code = this.getTypes().findIndex(item => type === item);
+    if (code === -1) {
+      throw new Error(`Invalid type '${type}'`);
+    }
+    return code;
   },
 
   /**
-   * Given a reference type code, return its string representation. If there is none, return the code
+   * Given a reference type code, return its string representation.
    * @param {Number} code
-   * @return {String|Number}
+   * @return {String}
    */
   typeFromCode : function(code) {
     if ( ! util.isNumber(code)) {
@@ -172,7 +180,10 @@ let bookends = {
     if ( code < 0 || code >= 40 ) {
       throw new Error("Code out of range");
     }
-    return this.getTypes()[code] || code;
+    if (this.getTypes()[code] === undefined) {
+      throw new Error(`No type with code ${code}.`);
+    }
+    return this.getTypes()[code];
   },
 
   /**
@@ -203,7 +214,7 @@ let bookends = {
    * @return {Promise<Number[]>}  A promise resovling with an array containing
    * the unique IDs of all found references as integer values.
    */
-  searchReferences: function(search) {
+  findIdsWhere: function(search) {
     if ( ! search || !util.isString(search)){
       throw new Error("Parameter must be a string");
     } 
@@ -346,12 +357,12 @@ let bookends = {
       throw new Error("First parameter must be an Array with at least one element");
     }
     data = data.map( (item, index) => {
-      if ( item.type !== undefined && ! typeof item.type === "number" ) {
-        let code  = this.codeFromType(item.type);
-        if( code === -1 ) {
+      if ( item.type !== undefined && typeof item.type !== "number" ) {
+        try {
+          item.type = this.codeFromType(item.type);
+        } catch (e) {
           throw new Error(`Invalid reference type '${item.type}' in reference ${index}.`);
         }
-        item.type = code;
         return item;
       }
       Object.getOwnPropertyNames(item).forEach( fieldName => {

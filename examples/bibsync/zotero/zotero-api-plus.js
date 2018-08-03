@@ -289,7 +289,7 @@ class Attachment extends Item {
    * @param {String} filepath
    */
   setFilepath(filepath) {
-    if ( !filepath || ! typeof filepath === "string" || !fs.existsSync(filepath)) throw new Error(`File '${filepath}' is invalid or does not exist.`);
+    if ( !filepath || ! typeof filepath === "string" ) throw new Error(`File '${filepath}' is invalid.`);
     this.filepath = filepath;
     let filename = path.basename(filepath);
     this.data.filename = filename;

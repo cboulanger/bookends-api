@@ -25,7 +25,7 @@ describe('Bookends', async function() {
   }); 
 
   it('should find references using an sql query', async () => {
-    let refIds = await bookends.searchReferences("title REGEX 'Bibliographic'");
+    let refIds = await bookends.findIdsWhere("title REGEX 'Bibliographic'");
     assert( util.isArray(refIds), "Method did not return an Array");
     assert.equal( refIds.length, 6, "Incorrect number of found references." );
   });   
@@ -105,7 +105,7 @@ describe('Bookends', async function() {
     data[0].authors = 'Doe, John';
     data[0].type = 'Edited book';
     data[0].thedate = 2008;
-    data[1].title = 'The quick brown fox jumps over the lazy dog';
+    data[1].title = 'The quick brown fox jumps over the lazy dog. ÄÖÜßáà';
     await bookends.updateReferences(data);
     data = await bookends.readReferences(idsInBoo1, fields);
     // for some reason, the references are returned in reverse order
@@ -114,7 +114,7 @@ describe('Bookends', async function() {
         location: "London",
         publisher: 'Library Association',
         thedate: '1973',
-        title: 'The quick brown fox jumps over the lazy dog',
+        title: 'The quick brown fox jumps over the lazy dog. ÄÖÜßáà',
         type: "Book",
         uniqueID: 86287 },       
       { authors: "Doe, John",
