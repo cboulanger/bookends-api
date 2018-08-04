@@ -8,6 +8,12 @@ const process = require('process');
 
 module.exports = {
   before : async function() {
+    if( ! (process.env.ZOTERO_API_KEY
+    && process.env.ZOTERO_USER_ID
+    && process.env.ZOTERO_GROUP_ID
+    && process.env.BOOKENDS_ATTACHMENT_PATH ) ) {
+      throw new Error('Please rename .env.dist into .env and set the environment variables.');
+    }
     return;
     osascript.execute('tell application "Bookends" to quit');
     fs.copyFileSync( __dirname + '/example.dist.bdb', __dirname + '/example.bdb' );

@@ -1,7 +1,5 @@
 const util = require('util');
 
- // @todo Store "extra" data in note, not "extra" field
-
 /**
  * Translates a reference, using dictionaries of "local dialects" and a global exchange format (yet to be fixed & specified)
  */
@@ -21,56 +19,87 @@ class Translator
     const toLocal = ! toGlobal;
     const map = toGlobal ? dictionary.fields.toGlobal : dictionary.fields.toLocal;
     // 'extra' field for untranslateable fields
-    if (typeof item.extra === "string") {
-      // unpack if exists in string form
-      translated_item.extra = {};
-      item.extra.split(/\n/).forEach(item=>{
-        let [key,value] = item.split(/:/);
-        translated_item.extra[key]=value;
-      });
-    } else {
-      translated_item.extra = {};
+    if (toGlobal) {
+      if (typeof item.extra === "string") {
+        // unpack if exists in string form
+        translated_item.extra = this.unpack(item.extra);
+      } else {
+        translated_item.extra = {};
+      }
     }
     Object.getOwnPropertyNames(item).forEach((field)=>{
       if (item[field]==="") return;
       let translated_name    = this.translateFieldName(map, field, item);
       let translated_content = this.translateFieldContent(map, field, item);
+      if( translated_name === undefined) return;
+
       // set default value of field
       if (translated_item[translated_name] === undefined
         && util.isObject(map[field])
         && typeof map[field].default === "function") {
         translated_item[translated_name] = map[field].default();
       }
-      // we have a direct equivalent in the target language
-      if (translated_name !== false) {
-        this.append(translated_item, translated_name, translated_content);
-        return;
-      }
-      // no direct equivalent of field name, but content exists
-      if (util.isObject(translated_content)) {
-        // if content is an object, field name depends on content, merge result into item
+
+      // no direct equivalent of field name in target language,
+      if (translated_name === false && util.isObject(translated_content)) {
+        // field name depends on content, merge result into item
         Object.getOwnPropertyNames(translated_content).forEach(key => {
           if ((dictionary.fields.toGlobal[key] || dictionary.fields.toLocal[key]) !== undefined){
-            // the field exists in source or target language
+            // the field exists in target language
             this.append(translated_item,key,translated_content[key]);
           } else {
             // otherwise, put in 'extra' field
             this.append( translated_item.extra, key, translated_content[key]);
           }
         });
-      } else if (! (field.startsWith("user") || field.startsWith('default'))){ // @todo make this configurable
-        // otherwise, store content in 'extra' field
-        this.append( translated_item.extra, field, translated_content || item[field]);
       }
+      // we have an equivalent in the target language
+      else if (typeof translated_name === "string"){
+        if ( translated_name.startsWith("zotero") || translated_name.startsWith('bookends') || translated_name === "citationKey" ){
+          // if we have a special field name, store content in 'extra' field
+          this.append(translated_item.extra, translated_name, translated_content);
+        } else {
+          this.append(translated_item, translated_name, translated_content);
+        }
+      }
+      // else ignore field
     });
-    // pack 'extra' field to as a string (HTTP header format) for readability
-    let extra = translated_item.extra;
-    if (typeof extra === "object" && Object.getOwnPropertyNames(extra).length > 0) {
-      translated_item.extra =
-        Object.getOwnPropertyNames(translated_item.extra)
-        .map(key => `${key}:${translated_item.extra[key]}`).join("\n");
+    // pack 'extra' field
+    if( toGlobal){
+      let extra = translated_item.extra;
+      if (typeof extra === "object" &&  Object.getOwnPropertyNames(extra).length > 0) {
+        translated_item.extra = this.pack(translated_item.extra);
+      }
     }
     return translated_item;
+  }
+
+
+  /**
+   * Packs an object into a string using the HTTP header format for readability
+   * @param {{}} map
+   * @return {string}
+   */
+  static pack(map){
+    if (! util.isObject(map)) throw new TypeError("Argument must be an object");
+    return Object.getOwnPropertyNames(map)
+      .map(key => `${key}:${map[key]}`)
+      .join("\n");
+  }
+
+  /**
+   * Unpacks a HTTP-header-like string into its key-value components. Returns an object
+   * @param str
+   * @return {{}}
+   */
+  static unpack(str) {
+    if (! util.isString(str)) throw new TypeError("Argument must be a string");
+    let map = {};
+    str.split(/\n/).forEach(item=>{
+      let [key,value] = item.split(/:/);
+      map[key]=value;
+    });
+    return map;
   }
 
   /**
@@ -145,7 +174,7 @@ class Translator
     }
 
     // if not defined no translation
-    if (map[field]===undefined) return false;
+    if (map[field]===undefined) return undefined;
 
     throw new Error(`Invalid field definition for '${field}'`);
   }

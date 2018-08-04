@@ -31,28 +31,36 @@ class BookendsZoteroSynchronizer {
 
   constructor(){
     this.gauge = new Gauge();
-    this.modificationDates = {};
-    this.ids = [];
-    this.syncData = {};
-    this.modifiedIds = [];
-    this.missing_attachments = [];
-    this.unmodified = 0;
+    this.bookendsModificationDates = {};
+    this.bookendsUniqueIds = [];
+    this.bookendsSyncData = {};
+    this.bookendsModifiedIds = [];
+    this.bookendsMissingAttachments = [];
+    this.bookendsUnmodified = 0;
     this.bookendslibraryVersion = 0;
   }
 
-  async sychronize(){
+
+  async synchronize(){
     await fixture.before();
 
-    this.gauge.show(`Getting information on Bookends and Zotero items...`, 0);
+    this.syncBookendsToZotero();
 
-    await this.prepareSyncData();
+    this.syncZoteroToBookends();
 
-    // Bookends
-    if (this.modifiedIds.length) {
+    fixture.after();
+  }
+
+  async syncBookendsToZotero(){
+
+    this.gauge.show(`Getting information on Bookends items...`, 0);
+    await this.prepareBookendsSyncData();
+
+    if (this.bookendsModifiedIds.length) {
       // save main reference data
-      this.gauge.show(`Retrieving ${this.modifiedIds.length} changed or new Bookends references ...`,0);
+      this.gauge.show(`Retrieving ${this.bookendsModifiedIds.length} changed or new Bookends references ...`,0);
       const bookends_fields = bookends.getFields();
-      const bookends_items = await bookends.readReferences(this.modifiedIds, bookends_fields);
+      const bookends_items = await bookends.readReferences(this.bookendsModifiedIds, bookends_fields);
       await this.saveBookendsItems(bookends_items);
 
       // save remaining items (notes and attachments)
@@ -65,33 +73,27 @@ class BookendsZoteroSynchronizer {
       }
     }
 
-    this.gauge.hide();
-
     // Success message
-    console.log(`Exported ${zotero.Item.synchronized.length} items to Zotero (including notes and attachments), ${this.unmodified} items were unchanged.`);
+    console.log(`Exported ${zotero.Item.synchronized.length} items to Zotero (including notes and attachments), ${this.bookendsUnmodified} items were unchanged.`);
 
     // Problems
-    if (this.missing_attachments.length){
+    if (this.bookendsMissingAttachments.length){
       console.error("The following attachments were not found and could not be uploaded:\n - " +
-      this.missing_attachments.join("\n - "));
+      this.bookendsMissingAttachments.join("\n - "));
     }
     if (zotero.Item.failedRequests.length){
       console.error("The following errors occurred when saving items to the Zotero server:");
       console.error(zotero.Item.failedRequests);
     }
 
-    //const zotero_item_data = await zotero.Item.getItemDataModifiedSinceVersion(this.bookendslibraryVersion);
-    //console.log(zotero_item_data);
-    //
-
-    fixture.after();
+    this.gauge.hide();
   }
 
-  async prepareSyncData(){
-    this.ids = await bookends.getGroupReferenceIds(groupName);
-    this.modificationDates = await bookends.modificationDates(this.ids);
-    this.syncData = await bookends.readReferences(this.ids, ['uniqueID',BOOKENDS_SYNCDATA_FIELD], false);
-    this.syncData.forEach((item,index) => {
+  async prepareBookendsSyncData(){
+    this.bookendsUniqueIds = await bookends.getGroupReferenceIds(groupName);
+    this.bookendsModificationDates = await bookends.modificationDates(this.bookendsUniqueIds);
+    this.bookendsSyncData = await bookends.readReferences(this.bookendsUniqueIds, ['uniqueID',BOOKENDS_SYNCDATA_FIELD], false);
+    this.bookendsSyncData.forEach((item, index) => {
       // check modification and sync date
       let itemSyncData = item[BOOKENDS_SYNCDATA_FIELD] || "";
       if ( ! resetSyncData && itemSyncData) {
@@ -104,7 +106,7 @@ class BookendsZoteroSynchronizer {
         if (! util.isObject(itemSyncData) || itemSyncData[syncID] === undefined) {
           return;
         }
-        let modTime = this.modificationDates[index].getTime();
+        let modTime = this.bookendsModificationDates[index].getTime();
         let [syncTime, version, key] = (""+itemSyncData[syncID]).split(/,/);
         syncTime = parseInt(syncTime) || 0;
 
@@ -114,7 +116,7 @@ class BookendsZoteroSynchronizer {
         }
 
         // we have an existing Zotero entry
-        this.syncData[item.uniqueID] = {
+        this.bookendsSyncData[item.uniqueID] = {
           syncTime, version, key
         };
 
@@ -125,19 +127,19 @@ class BookendsZoteroSynchronizer {
         //console.log([new Date(modTime).toUTCString(),new Date(syncTime).toUTCString()]);
         //console.log(modTime - syncTime);
         if (modTime - syncTime < 100000  ) {
-          this.unmodified++;
+          this.bookendsUnmodified++;
           return;
         }
       }
-      this.modifiedIds.push(item.uniqueID);
+      this.bookendsModifiedIds.push(item.uniqueID);
     });
   }
   
-  async saveBookendsItems(bookends_items) {
-    const total = bookends_items.length;
+  async saveBookendsItems(bookends_items_data) {
+    const total = bookends_items_data.length;
 
     // main loop
-    for (let [index, bookends_item_data] of bookends_items.entries() ) {
+    for (let [index, bookends_item_data] of bookends_items_data.entries() ) {
 
       // translate
       let global_item_data = translate.toGlobal(dict.bookends, bookends_item_data);
@@ -149,20 +151,14 @@ class BookendsZoteroSynchronizer {
       }
 
       // check if item has already been synchronized
-      let itemSyncData = this.syncData[bookends_item_data.uniqueID];
+      let itemSyncData = this.bookendsSyncData[bookends_item_data.uniqueID];
       if (itemSyncData !== undefined) {
         zotero_item_data.key = itemSyncData.key;
         //zotero_item_data.version = itemSyncData.version;
       }
 
       if (debug) {
-        // output data only, do not upload
-        console.log(`================= Bookends item #${index} =================`);
-        console.log(bookends_item_data);
-        console.log(`================= Global item #${index} =================`);
-        console.log(global_item_data);
-        console.log(`================= Zotero item #${index} =================`);
-        console.log(zotero_item_data);
+        this.dumpTranslationData(bookends_item_data,global_item_data,zotero_item_data, index);
       } else {
 
         // create item model
@@ -186,7 +182,7 @@ class BookendsZoteroSynchronizer {
               attachment.save(true); // async
               attachment.upload(); // async, will upload when it is saved
             } catch (e) {
-              this.missing_attachments.push(filename);
+              this.bookendsMissingAttachments.push(filename);
             }
           });
         }
@@ -209,6 +205,15 @@ class BookendsZoteroSynchronizer {
         }
       }
     }    
+  }
+
+  dumpTranslationData(source,global,target, index) {
+    console.log(`================= Source item #${index} =================`);
+    console.log(source);
+    console.log(`================= Global item #${index} =================`);
+    console.log(global);
+    console.log(`================= Target item #${index} =================`);
+    console.log(target);
   }
 
   /**
@@ -249,12 +254,40 @@ class BookendsZoteroSynchronizer {
       }
     }
   }
+
+  async syncZoteroToBookends() {
+    const bookends_version = 6501;
+    const limit = 100;
+    const message = await zotero.library.items({since: bookends_version, limit:0});
+    const number_total = message.headers['total-results'];
+    let number_downloaded = 0;
+    let zotero_items_data = [];
+    do {
+      this.gauge.show(`Downloading zotero items ${number_downloaded}/${number_total}`, number_downloaded/number_total);
+      let i = setInterval(() => this.gauge.pulse(),50);
+      zotero_items_data = (await zotero.library.items({since: bookends_version, limit})).data;
+      clearInterval(i);
+      number_downloaded += zotero_items_data.length;
+      for ( let [index, item] of zotero_items_data.entries()) {
+        let zotero_item_data = item.data;
+        let global_item_data = translate.toGlobal(dict.zotero, zotero_item_data);
+        if (global_item_data.extra){
+          let uniqueID = translate.unpack(global_item_data.extra).uniqueID;
+        }
+        let bookends_item_data = translate.toLocal(dict.bookends, global_item_data);
+        this.dumpTranslationData(zotero_item_data,global_item_data,bookends_item_data, index);
+      }
+    } while(number_downloaded < number_total);
+  }
+
 }
 
 (async () => {
   const synchronizer = new BookendsZoteroSynchronizer();
   try {
-    await synchronizer.sychronize();
+    //await synchronizer.sychronize();
+    await synchronizer.syncZoteroToBookends();
+
   } catch (e) {
     console.error(e);
   }

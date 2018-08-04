@@ -354,11 +354,12 @@ const fields_toGlobal =
   creators: {
     translateName: function() {return false;}, // field name depends on content
     translateContent: function(data){
-      let field, content={};
+      let field,name, content={};
       data.creators.map(function(elem) {
         // @todo make this more sophisticated
-        const name = elem.name || elem.lastName + ", " + elem.firstName;
-        content[field] = (content[field]?content[field]+"; ":"")+ name;
+        name = elem.name || elem.lastName + ", " + elem.firstName;
+        field = elem.creatorType+"s";
+        content[field] = (content[field] ? content[field]+"; ":"")+ name;
       });
       return content;
     }
@@ -368,7 +369,7 @@ const fields_toGlobal =
       return "keywords";
     },
     translateContent: function(data){
-      return data.tags.reduce((result, elem) => (result ? result + "; " :"") + elem.tag);
+      return data.tags.reduce((result, elem) => (result ? result + "; " :"") + elem.tag, "");
     }
   },
   applicationNumber: 'applicationNumber',
@@ -432,7 +433,7 @@ const fields_toGlobal =
   documentNumber: 'documentNumber',
   encyclopediaTitle: 'encyclopediaTitle',
   episodeNumber: 'episodeNumber',
-  extra: 'extra',
+  extra: "extra",
   audioFileType: 'audioFileType',
   filingDate: 'filingDate',
   audioRecordingFormat: 'audioRecordingFormat',

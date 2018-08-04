@@ -98,20 +98,6 @@ class Item extends EventEmitter {
   };
 
   /**
-   * Return the data of all items modified since a given version.
-   * GET <userOrGroupPrefix>/items?since=<last items version>&format=versions
-   * If-Modified-Since-Version: <current local library version>
-   * @return {Promise<String[]>}
-   */
-  static async getItemDataModifiedSinceVersion(version){
-    return Object.getOwnPropertyNames((await library.client.get(
-      library.path('items'),
-      { key:library.key, since: version },
-      { 'If-Modified-Since-Version': version }
-    )).data);
-  };
-
-  /**
    * Create a random 32-character string which is used to make unversioned write requests
    * @return {string}
    */
@@ -426,11 +412,10 @@ Item.failedRequests = [];
 
 /**
  * Return the current sync version of the library
- * @todo There must be a better way than making a bogus request
  * @return {Promise<Number>}
  */
 library.getVersion = async function(){
-  return (await library.client.get(library.path('collections/top'),{ key:library.key, format: "versions" })).version;
+  return (await zotero.library.items({limit:0})).version;
 };
 
 

@@ -112,7 +112,6 @@ const fields_toLocal =
   conferenceName: 'journal',
   callNumber: 'user5',
   date: 'date',
-  dateAdded: 'added',
   doi: 'user17',
   edition: 'user2',
   editors: {
@@ -229,12 +228,6 @@ const fields_toLocal =
   presentationType: false,
   versionNumber: false,
   websiteType: false,
-  // custom1: 'user4',
-  // custom2: 'user8',
-  // custom3: 'user14',
-  // custom4: 'user15',
-  // custom5: 'user16',
-  // custom6: 'user19',
   version: 'user20'
 };
 
@@ -324,7 +317,6 @@ const fields_toGlobal = {
   journal: 'journal',
   user5: 'callNumber',
   thedate: 'date',
-  added: 'dateAdded',
   user17: 'doi',
   user2: 'edition',
   user6: function (item) {
