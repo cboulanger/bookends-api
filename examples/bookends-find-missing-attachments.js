@@ -1,5 +1,5 @@
 /**
- * Script to 1) display, 2) find and 3) attach (2 & 3 not yet implemented) missing attachments
+ * Script to find missing attachments and copy them into the attachment folder
  */
 
 // see readme.md first to configure the examples
@@ -25,7 +25,7 @@ const bookends_attachment_path = path.resolve(process.env.BOOKENDS_ATTACHMENT_PA
 const icloud_max_download = 0;
 
 // whether to output debug messsages
-const debug = true;
+const debug = false;
 
 (async () => {
 
@@ -50,8 +50,9 @@ for (let [index, item] of data.entries()) {
   for (let attachment_name of item.attachments.split(/\n/)) {
     // check if file exists
     let attachment_path = bookends_attachment_path + "/" + attachment_name;
-    if ( fs.existsSync(attachment_path)) {
-      // all good, attachment is there
+    let attachment_icloud_path = bookends_attachment_path + "/." + attachment_name + ".icloud";
+    if ( fs.existsSync(attachment_path) || fs.existsSync(attachment_icloud_path)) {
+      // all good, attachment is there, either as the real file or a reference to the file in iCloud
       continue;
     }
     // file is missing
@@ -83,12 +84,6 @@ for (let [index, item] of data.entries()) {
       }
 
       if (filepath.endsWith(".icloud") ){
-        if( path.resolve(path.dirname(filepath)) === bookends_attachment_path ){
-          // file is already in attachment folder
-          if (debug) console.log(` >>> File ${attachment_name} is already in attachment folder and can be downloaded from iCloud on demand.`);
-          continue;
-        }
-
         if ( icloud_max_download && Object.getOwnPropertyNames(icloud_downloads_in_progress).length > icloud_max_download) {
           if (debug) console.log(` >>> Skipping ${attachment_name}.`);
           icloud_not_downloaded.push(attachment_name);
@@ -154,8 +149,8 @@ if (notfound.length) {
   console.info(`\nThe following files could not be found:`);
   console.info(notfound);
 }
-if (icloud_downloaded) {
-  console.info(`\nThe following files were found in iCloud Drive and have been  downloaded. Plese run the script again to copy them into the attachment folder.`);
+if (icloud_downloaded.length) {
+  console.info(`\nThe following files were found in iCloud Drive and have been downloaded. Plese run the script again to copy them into the attachment folder.`);
   console.info(icloud_downloaded);
 }
 
@@ -165,5 +160,3 @@ if (icloud_not_downloaded.length){
 }
 
 })().catch(e => console.error(e));
-
-
