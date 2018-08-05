@@ -111,6 +111,9 @@ class Translator
    * @param {String} separator Separator for string type fields, defaults to "; "
    */
   static append(item, field, content, separator="; ") {
+    // empty content will not be appended
+    if( !content) return;
+    // append to old content, if any
     let oldContent = item[field];
     if ( oldContent === undefined || oldContent === ""){
       item[field] = content;

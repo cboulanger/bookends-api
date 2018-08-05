@@ -352,7 +352,7 @@ class Attachment extends Item {
         .on("error", reject)
         .on("data", (chunk) => {
           bytes += chunk.length;
-          console.debug("Sent " +  bytes + " of " + uploadSize + " bytes of data.");
+          //console.debug("Sent " +  bytes + " of " + uploadSize + " bytes of data.");
         })
         .pipe(writeStream);
       });
@@ -415,7 +415,7 @@ Item.failedRequests = [];
  * @return {Promise<Number>}
  */
 library.getVersion = async function(){
-  return (await zotero.library.items({limit:0})).version;
+  return (await this.items({limit:0})).version;
 };
 
 

@@ -374,7 +374,7 @@ let bookends = {
     });
     let json;       
     try{
-      json = JSON.stringify(data);
+      json = JSON.stringify(data).replace(/\\"/g,'\\\\"');
     } catch (e) {
       throw new Error("Data cannot be serialized to JSON: " + e.message);
     }

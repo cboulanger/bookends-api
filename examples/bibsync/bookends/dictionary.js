@@ -92,7 +92,7 @@ const fields_toLocal =
     }
   },
   accessDate: 'user20',
-  abstract: 'abstract',
+  abstractNote: 'abstract',
   authors: {
     translateName: function (data) {
       return 'authors';
@@ -111,7 +111,7 @@ const fields_toLocal =
   collections: 'groups',
   conferenceName: 'journal',
   callNumber: 'user5',
-  date: 'date',
+  date: 'thedate',
   doi: 'user17',
   edition: 'user2',
   editors: {
@@ -124,7 +124,15 @@ const fields_toLocal =
       }).join(", and ");
     }
   },
-  issue: 'issue',
+  issue: {
+    translateName: function (data) {
+      return "volume";
+    },
+    translateContent: function (data) {
+      // if volume is set, let the volume field take care of it (return null), otherwise set issue only
+      return data['volume'] ? null : (data['issue'] ? `(${data['issue']})`:"")
+    }
+  },
   isbn: 'user6',
   issn: 'user6',
   institution: 'publisher',
@@ -150,8 +158,14 @@ const fields_toLocal =
   url: 'url',
   university: 'publisher',
   websiteTitle: 'journal',
-  volume: "volume",
-  abstractNote: false,
+  volume: {
+    translateName: function (data) {
+      return "volume";
+    },
+    translateContent: function (data) {
+      return  (data['volume']?`${data['volume']} `:"") + (data['issue']?`(${data['issue']})`:"")
+    }
+  },
   archive: false,
   artworkSize: false,
   assignee: false,
@@ -174,7 +188,7 @@ const fields_toLocal =
   documentNumber: false,
   encyclopediaTitle: false,
   episodeNumber: false,
-  extra: "user19",
+  extra: false,
   audioFileType: false,
   filingDate: false,
   firstPage: false,
@@ -295,7 +309,7 @@ const fields_toGlobal = {
     }
   },
   user20: 'version',
-  abstract: 'abstract',
+  abstract: 'abstractNote',
   authors: {
     translateName: function (data) {
       return 'authors';

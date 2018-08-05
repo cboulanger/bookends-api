@@ -10,7 +10,7 @@ const makeCreatorFunc = function(creatorType, field = creatorType+"s") {
     if (data[field] === undefined) throw new Error(`Invalid creatorType '${creatorType}' or field '${field}'`);
     if (typeof data[field] !== "string") throw new Error(`Content in field '${field}' must be string`);
     data[field].split(/;/).map(elem => {
-      if( elem.includes(",") && elem.length > 3 ){
+      if( elem.includes(",") && elem.length > 3 && ! elem.endsWith(',') ){
         part = elem.split(/,/);
         creators.push({
           creatorType,
@@ -120,7 +120,7 @@ const fields_toLocal =
     }
   },
   accessDate: 'accessDate',
-  abstract: 'abstractNote',
+  abstractNote: 'abstractNote',
   attachments : "attachments",
   authors: {
     default: () => [],
@@ -188,7 +188,6 @@ const fields_toLocal =
   university: 'university',
   websiteTitle: 'websiteTitle',
   volume: 'volume',
-  abstractNote: 'abstractNote',
   archive: 'archive',
   artworkSize: 'artworkSize',
   assignee: 'assignee',
