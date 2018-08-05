@@ -1,7 +1,24 @@
+#!/usr/bin/env node
+
 /**
  * Script to synchronize a Bookends database with a Zotero group
  * Note: very hackish proof of concept, will change substantially
+ *
+ * Needs to be rewritten and expanded
+ *
+ * - from Bookends: get all ids, sync time, modification time, Zotero version
+ * -> determine Bookends library version: B = latest version in references
+ * - from Zotero: get ALL keys with versions, get all deleted keys since version B, get Zotero library version Z
+ * -> determine missing ids / keys in Bookends und Zotero
+ * - from Zotero: get all changed refs since version B plus missing ones
+ * -> update / create in Bookends
+ * - from Bookends: get all refs that changed since the sync time stored
+ *
+ *
+ *
  */
+
+
 
 // see readme.md first to configure the examples
 require('dotenv').config();
@@ -303,20 +320,25 @@ class BookendsZoteroSynchronizer {
     let number_retrieved = 0;
     let zotero_items_data = [];
     if (number_total===0) {
+      this.gauge.hide();
       console.info("Bookends library is up to date.");
       return;
     }
     let number_updated = 0;
     let number_created = 0;
+    let failed_keys = [];
     do {
-      this.gauge.show(`Retrieving zotero items ${number_retrieved}/${number_total}`, number_retrieved/number_total);
+      this.gauge.show(`Retrieving zotero items ${number_retrieved}-${number_retrieved+limit}`, number_retrieved/number_total);
       let i = setInterval(() => this.gauge.pulse(),50);
-      let message = await zotero.Item.library.items({since: bookends_library_version, limit}); //fixme
+
+      let message = await zotero.Item.library.items({since: bookends_library_version, limit, start:number_retrieved}); //fixme
       zotero_items_data = message.data;
       clearInterval(i);
-      number_retrieved += zotero_items_data.length;
       const syncTimestamp = Date.now();
+
       for ( let [index, item] of zotero_items_data.entries()) {
+        this.gauge.show(`Processing zotero items ${number_retrieved+index}/${number_total}`, (number_retrieved+index)/number_total);
+        this.gauge.pulse();
         let zotero_item_data = item.data;
         if( ['note','attachment'].includes(zotero_item_data.itemType)){
           // not downloading notes and attachments
@@ -330,26 +352,38 @@ class BookendsZoteroSynchronizer {
         }
         bookends_item_data = this.updateBookendsSyncDataField(bookends_item_data, syncTimestamp, zotero_library_version, zotero_item_data.key);
 
-        let zotero_key = parseInt(this.zoteroKeyToBookendsIds[zotero_item_data.key]);
-        let bookends_id = zotero_key || parseInt(translate.unpack(global_item_data.extra)['bookends-uniqueId']);
+        let bookends_id =
+          parseInt(this.zoteroKeyToBookendsIds[zotero_item_data.key])
+          || parseInt(translate.unpack(global_item_data.extra)['bookends-uniqueId']);
 
         if (bookends_id) {
           // update reference
           bookends_item_data.uniqueID = bookends_id;
-          await bookends.updateReferences([bookends_item_data]);
-          number_updated++;
+          try {
+            await bookends.updateReferences([bookends_item_data]);
+            number_updated++;
+          } catch (e) {
+            console.error(e);
+            failed_keys.push(zotero_item_data.key);
+          }
+
         } else {
           // create new reference
-          bookends.addReferences([bookends_item_data]);
-          number_created++;
+          try {
+            await bookends.addReferences([bookends_item_data]);
+            number_created++;
+          } catch (e) {
+            console.error(e);
+            failed_keys.push(zotero_item_data.key);
+          }
         }
       }
-    } while(++number_retrieved < number_total);
+      number_retrieved += zotero_items_data.length;
+    } while(number_retrieved < number_total && zotero_items_data.length);
     this.gauge.hide();
-    console.info(`Updated ${number_updated} and created ${number_created} references.`);
+    console.info(`Updated ${number_updated} and created ${number_created} references. ${failed_keys.length} updates/additions failed`);
   }
 }
-
 
 let argv = yargs
   .usage('$0 <path> [options]', 'Synchronizes a Bookends database with a Zotero library.', (yargs) => {

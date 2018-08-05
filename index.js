@@ -374,14 +374,14 @@ let bookends = {
     });
     let json;       
     try{
-      json = JSON.stringify(data).replace(/\\"/g,'\\\\"');
+      json = JSON.stringify(data).replace(/\\/g,'\\\\');
     } catch (e) {
       throw new Error("Data cannot be serialized to JSON: " + e.message);
     }
     return runOsaCmd(command( 'SJSN', quote(json) ))
     .then(result => {
       if ( result === null) return; 
-      throw new Error( "updateReferences failed:" + result);
+      throw new Error( `updateReferences() failed.\n >>> Error:\n${result}\n >>> Data:\n${json}`);
     });
   },
 
@@ -427,6 +427,9 @@ let bookends = {
         let utc = new Date(localDate.getTime() + localDate.getTimezoneOffset() * 60000);
         return utc;
       });
+    })
+    .catch(err => {
+      throw new Error("modificationDates() failed: is the database empty?");
     });
   }
 };

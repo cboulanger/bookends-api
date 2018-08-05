@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 /**
  * Script to find missing attachments and copy them into the attachment folder
  */

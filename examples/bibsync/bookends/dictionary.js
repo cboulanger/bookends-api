@@ -147,7 +147,7 @@ const fields_toLocal =
   pages: 'pages',
   publisher: 'publisher',
   pubmedId: 'user18',
-  reportNumber: 'issue',
+  reportNumber: 'volume',
   reprintEdition: 'user12',
   startPage: false,
   endPage: false,
