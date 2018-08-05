@@ -34,6 +34,7 @@
     "mocha": "^5.2.0",
     "multistream": "^2.1.1",
     "request": "^2.87.0",
+    "yargs": "^12.0.1",
     "zotero": "^0.4.1"
   }
 }

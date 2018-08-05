@@ -10,11 +10,10 @@ const request = require("request");
 
 zotero.promisify(util.promisify.bind(Promise));
 
-const library = new zotero.Library({ group: process.env.ZOTERO_GROUP_ID, key: process.env.ZOTERO_API_KEY });
-
 /**
  * A model of a Zotero item
  * @todo move static methods to new Items class
+ * @todo change the way the library is referenced
  */
 class Item extends EventEmitter {
 
@@ -25,7 +24,7 @@ class Item extends EventEmitter {
   static async sendAll(){
     let sentItems = [];
     while (this.queue.length) {
-      let version = await library.getVersion();
+      let version = await Item.getLibraryVersion();
       let data = this.queue.map(item => {
         //This should work, but doesn't
         //if (!item.data.key) item.data.version = 0;
@@ -33,13 +32,13 @@ class Item extends EventEmitter {
       });
 
       // send to server
-      let message = await library.client.post(
-        library.path('items'),
-        {key: library.key},
+      let message = await this.library.client.post(
+        this.library.path('items'),
+        {key: this.library.key},
         data,
         {
           'Zotero-Write-Token': this.createWriteToken(),
-          'If-Unmodified-Since-Version': version
+          'If-Unmodified-Since-Version': version // fixme this will always overwrite!
         }
       );
 
@@ -94,7 +93,7 @@ class Item extends EventEmitter {
    * @return {Promise<{}>}
    */
   static async getVersions(){
-    return (await library.client.get(library.path('items'),{ key:library.key, format: "versions" })).data;
+    return (await this.library.client.get(this.library.path('items'),{ key:this.library.key, format: "versions" })).data;
   };
 
   /**
@@ -130,6 +129,8 @@ class Item extends EventEmitter {
    */
   constructor (itemType, debug = false){
     super();
+
+    this.library = Item.library; // FIXME
 
     if(!itemType || typeof itemType !== "string") throw new Error("Invalid argument");
 
@@ -183,7 +184,7 @@ class Item extends EventEmitter {
    * @return {Promise<void>}
    */
   async downloadTemplate(itemType){
-    return (await library.client.get("/items/new?itemType=" + itemType)).data;
+    return (await this.library.client.get("/items/new?itemType=" + itemType)).data;
   }
 
   /**
@@ -288,7 +289,7 @@ class Attachment extends Item {
    */
   async downloadTemplate(itemType){
     if (!this.data.linkMode) throw new Error("You have to set the linkMode first");
-    return (await library.client.get(`/items/new?itemType=${itemType}&linkMode=${this.data.linkMode}`)).data;
+    return (await this.library.client.get(`/items/new?itemType=${itemType}&linkMode=${this.data.linkMode}`)).data;
   }
 
   async upload() {
@@ -303,14 +304,15 @@ class Attachment extends Item {
       let md5hash = require('md5-file').sync(this.filepath);
       let body = `md5=${md5hash}&filename=${filename}&filesize=${fileStat.size}&mtime=${fileStat.mtime.getTime()}`;
 
-      let message = await library.client.post(
-      library.path(`items/${this.data.key}/file`),
-      {key: library.key},
-      body,
-      { 'Content-Type': 'application/x-www-form-urlencoded',
-        'If-None-Match': "*"
-      }
+      let message = await this.library.client.post(
+        this.library.path(`items/${this.data.key}/file`),
+        {key: this.library.key},
+        body,
+        { 'Content-Type': 'application/x-www-form-urlencoded',
+          'If-None-Match': "*"
+        }
       );
+      this.library.version = message.version;
       let uploadConfig = message.data;
       if ( uploadConfig.exists ) {
         // File already uploaded
@@ -358,15 +360,16 @@ class Attachment extends Item {
       });
 
       //console.log("Registering upload...");
-      message = await library.client.post(
-      library.path(`items/${this.data.key}/file`),
-      {key: library.key},
-      `upload=${uploadConfig.uploadKey}`,
-      {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'If-None-Match': "*"
-      }
+      message = await this.library.client.post(
+        this.library.path(`items/${this.data.key}/file`),
+        {key: this.library.key},
+        `upload=${uploadConfig.uploadKey}`,
+        {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'If-None-Match': "*"
+        }
       );
+      this.library.version = message.version;
     } catch (e) {
       Item.failedRequests.push([e.message, filename ]);
     }
@@ -414,9 +417,12 @@ Item.failedRequests = [];
  * Return the current sync version of the library
  * @return {Promise<Number>}
  */
-library.getVersion = async function(){
-  return (await this.items({limit:0})).version;
+Item.getLibraryVersion = async function(){
+  return (await this.library.items({limit:0})).version;
 };
 
+zotero.Item = Item;
+zotero.Note = Note;
+zotero.Attachment = Attachment;
 
-module.exports = { library, Item, Note, Attachment };
+module.exports = zotero;

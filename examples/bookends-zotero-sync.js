@@ -14,6 +14,7 @@ const util = require('util');
 const Gauge = require('gauge');
 const zotero = require('./bibsync/zotero/zotero-api-plus');
 const assert = require('assert');
+const yargs = require('yargs');
 
 // dictionary to translate from and to the different field schemas
 let dict = {
@@ -26,11 +27,11 @@ const debug = false;
 const resetSyncData = false;
 const groupName = "all";
 const BOOKENDS_SYNCDATA_FIELD = "user15";
-const syncID = "zotero:group:" + process.env.ZOTERO_GROUP_ID;
 
 class BookendsZoteroSynchronizer {
 
-  constructor(){
+  constructor(library, sync_id){
+    this.syncId = sync_id;// FIXME
     this.gauge = new Gauge();
     this.bookendsModificationDates = {};
     this.bookendsUniqueIds = [];
@@ -40,14 +41,16 @@ class BookendsZoteroSynchronizer {
     this.bookendsUnmodified = 0;
     this.bookendslibraryVersion = 0;
     this.zoteroKeyToBookendsIds = {}
+    this.zoteroCreatedItems=0;
+    this.zoteroUpdatedItems=0;
   }
 
 
   /**
-   * Main method
+   * test method
    * @return {Promise<void>}
    */
-  async synchronize(){
+  async test(){
     await fixture.before();
     await this.syncBookendsToZotero();
     await this.syncZoteroToBookends();
@@ -55,9 +58,6 @@ class BookendsZoteroSynchronizer {
   }
 
   async syncBookendsToZotero(){
-
-    this.gauge.show(`Getting information on Bookends items...`, 0);
-    await this.prepareBookendsSyncData();
 
     if (this.bookendsModifiedIds.length) {
       // save main reference data
@@ -77,7 +77,7 @@ class BookendsZoteroSynchronizer {
     }
 
     // Success message
-    console.log(`Exported ${zotero.Item.synchronized.length} items to Zotero (including notes and attachments), ${this.bookendsUnmodified} items were unchanged.`);
+    console.log(`Synchronized ${zotero.Item.synchronized.length} items with Zotero library (including notes and attachments), creating ${this.zoteroCreatedItems} and updating ${this.zoteroUpdatedItems} items.`);
 
     // Problems
     if (this.bookendsMissingAttachments.length){
@@ -93,6 +93,7 @@ class BookendsZoteroSynchronizer {
   }
 
   async prepareBookendsSyncData(){
+    this.gauge.show(`Getting information on Bookends items...`, 0);
     this.bookendsUnmodified = 0;
     this.bookendsModifiedIds = [];
     this.zoteroKeyToBookendsIds = {};
@@ -109,11 +110,11 @@ class BookendsZoteroSynchronizer {
         } catch (e) {
           return;
         }
-        if (! util.isObject(itemSyncData) || itemSyncData[syncID] === undefined) {
+        if (! util.isObject(itemSyncData) || itemSyncData[this.syncId] === undefined) {
           return;
         }
         let modTime = this.bookendsModificationDates[index].getTime();
-        let [syncTime, version, key] = (""+itemSyncData[syncID]).split(/,/);
+        let [syncTime, version, key] = (""+itemSyncData[this.syncId]).split(/,/);
         syncTime = parseInt(syncTime) || 0;
 
         // set bookends library version to the highest value found in the references
@@ -143,6 +144,8 @@ class BookendsZoteroSynchronizer {
   }
 
   async saveBookendsItemsInZotero(bookends_items_data) {
+    this.zoteroCreatedItems=0;
+    this.zoteroUpdatedItems=0;
     const total = bookends_items_data.length;
 
     // main loop
@@ -161,8 +164,11 @@ class BookendsZoteroSynchronizer {
       let itemSyncData = this.bookendsSyncData[bookends_item_data.uniqueID];
       if (itemSyncData !== undefined) {
         zotero_item_data.key = itemSyncData.key;
-        //zotero_item_data.version = itemSyncData.version;
+        this.zoteroUpdatedItems++;
+      } else {
+        this.zoteroCreatedItems++;
       }
+
 
       if (debug) {
         this.dumpTranslationData(bookends_item_data,global_item_data,zotero_item_data, index);
@@ -273,7 +279,7 @@ class BookendsZoteroSynchronizer {
         }
       }
     }
-    itemSyncData[syncID] = [timestamp, zoteroVersion, zoteroKey].join(',');
+    itemSyncData[this.syncId] = [timestamp, zoteroVersion, zoteroKey].join(',');
     bookendsItemData[BOOKENDS_SYNCDATA_FIELD] = JSON.stringify(itemSyncData).replace(/"/g,"'");
     if (syncDataOnly){
       Object.getOwnPropertyNames(bookendsItemData).map(name => {
@@ -291,7 +297,7 @@ class BookendsZoteroSynchronizer {
 
     // synchronize existing
     const limit = 100;
-    const message = await zotero.library.items({since: bookends_library_version, limit:0});
+    const message = await zotero.Item.library.items({since: bookends_library_version, limit:0}); // fixme
     const number_total = parseInt(message.headers['total-results']);
     let zotero_library_version = message.version;
     let number_retrieved = 0;
@@ -305,7 +311,7 @@ class BookendsZoteroSynchronizer {
     do {
       this.gauge.show(`Retrieving zotero items ${number_retrieved}/${number_total}`, number_retrieved/number_total);
       let i = setInterval(() => this.gauge.pulse(),50);
-      let message = await zotero.library.items({since: bookends_library_version, limit});
+      let message = await zotero.Item.library.items({since: bookends_library_version, limit}); //fixme
       zotero_items_data = message.data;
       clearInterval(i);
       number_retrieved += zotero_items_data.length;
@@ -344,11 +350,72 @@ class BookendsZoteroSynchronizer {
   }
 }
 
-(async () => {
-  const synchronizer = new BookendsZoteroSynchronizer();
-  try {
-    await synchronizer.synchronize();
-  } catch (e) {
-    console.error(e);
+
+let argv = yargs
+  .usage('$0 <path> [options]', 'Synchronizes a Bookends database with a Zotero library.', (yargs) => {
+    yargs.positional('path', {
+      describe: 'the path to the zotero library, either groups/<group id> or user/<user id>.',
+      type: 'string'
+    })
+  })
+  .options({
+    "target":{
+      describe: 'If given, do only one-way sync to target',
+      type: "string"
+    },
+    "key":{
+      describe: 'The zotero API key, if not provided as the environment variable ZOTERO_API_KEY.',
+      type: "string"
+    }
+    // ,
+    // "verbose":{
+    //   alias : "v",
+    //   describe: 'Verbose logging'
+    // }
+  })
+  .showHelpOnFail()
+  .argv;
+
+let options = {
+  key: process.env.ZOTERO_API_KEY || argv.key
+};
+let [prefix,id] = argv.path.split(/\//);
+if (! id || isNaN(parseInt(id)) ) prefix= null;
+let sync_id; // fixme
+
+switch (prefix) {
+  case "groups":
+    options['group'] = id;
+    sync_id = "zotero:group:"+id;
+    break;
+  case "users":
+    options['user'] = id;
+    sync_id = "zotero:user:"+id;
+    break;
+  default:
+    console.error("Invalid path: must be either groups/<group id> or user/<user id>");
+    process.exit(1);
+}
+
+const library = new zotero.Library(options);
+zotero.Item.library = library; //FIXME
+
+const synchronizer = new BookendsZoteroSynchronizer(library,sync_id);
+(async() =>{
+  await synchronizer.prepareBookendsSyncData();
+  switch (argv.target) {
+    case "zotero":
+      await synchronizer.syncBookendsToZotero();
+      break;
+    case "bookends":
+      await synchronizer.syncZoteroToBookends();
+      break;
+    case undefined:
+      await synchronizer.syncBookendsToZotero();
+      await synchronizer.syncZoteroToBookends();
+      break;
+    default:
+      console.error("Invalid target: must be either bookends, zotero or not provided.");
+      process.exit(1);
   }
-})();
+})().catch(e => console.error(e));
