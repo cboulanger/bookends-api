@@ -3,11 +3,7 @@
 /**
  * Sets the BibTeX key field (user1) using your own formula
  * here: <authors's last names, concatenated by '+'>-<year>-<first non-stop-word in title>
-, 
  */
-
-// see readme.md first to configure the examples
-require('dotenv').config();
 
 const process = require('process');
 const bookends = require('../index');
