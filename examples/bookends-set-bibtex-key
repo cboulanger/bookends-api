@@ -14,6 +14,11 @@ const bookends = require('../index');
 const Gauge = require('gauge');
 const Confirm = require('prompt-confirm');
 
+require('death')((signal,err)=>{
+  console.log(signal);
+  process.exit(0);
+});
+
 (async () => {
 
 const gauge = new Gauge();
@@ -38,11 +43,12 @@ for (let [index, data] of refs.entries()) {
   // use up to three author last names and cocatenate them by "+"
   let author_last_names = (data.authors||data.editors)
   .split(/\n/)
-  .slice(0,2)
-  .reduce((prev,curr) => (prev?"+":"") + curr.split(/,/)[0].trim().replace(/\s/g,"_").toLocaleLowerCase(), "") || "anonymous";
+  .slice(0,3)
+  .map(author => author.split(/,/)[0].trim().replace(/\s/g,"-").toLocaleLowerCase())
+  .join('+') || "anonymous";
   // take the first word in the title that is not a stop word and has more than two letters
   let title_first_word = data.title
-  .replace(punctuationRegExpr,"")
+  .replace(punctuationRegExpr," ")
   .split(/ /)
   .filter(word => word.length > 2 && ! stop_words.some(sw => sw.toLocaleLowerCase() === word.toLocaleLowerCase()))
   .reduce((prev,curr)=>prev?prev:curr,"")
@@ -51,24 +57,32 @@ for (let [index, data] of refs.entries()) {
   let year = (data.thedate.match(/([0-9]{4})/)||[,])[1] || "noyear"
   // bibtex key is "author1+author2-date-titleword"
   let key = author_last_names + "-" + year + "-" + title_first_word
-  updated_refs.push({
+  let updated_data = {
     uniqueID: data.uniqueID,
     user1: key
-  });
+  };
+  // this fixes ", and" instead of "\n"
+  ['authors','editors'].forEach(creator => {
+    if (data[creator].includes(", and ")) {
+      updated_data[creator] = data[creator].replace(/, and /g,"; ");
+    }
+  })
+  updated_refs.push(updated_data);
 }
-// this fakes a progress feedback, since we are submitting the data in a batch
-// the result might be more or less convincing depending on the speed of your machine 
+
 let counter = 0;
-let intervalId = setInterval(() => {
-  gauge.show(`Updating BibTeX key (${counter}/${total})...`, counter/total);
-  gauge.pulse();
-  counter = Math.min(counter+2,total);
-},50);
-await bookends.updateReferences(updated_refs);
-clearInterval(intervalId);
+const limit = 100;
+do {
+  let slice = updated_refs.slice(counter, counter + limit);
+  gauge.show(`Updating BibTeX keys (${counter}/${total})...`, counter/total);
+  // this keeps the pulse going during the update
+  let intervalId = setInterval(() => gauge.pulse(), 75);
+  await bookends.updateReferences(slice);
+  clearInterval(intervalId);
+  counter += limit;
+} while ( counter < total);
 gauge.hide();
 console.info(`Updated ${total} BibTex keys.`);
-
 
 })().catch(e => console.error(e));
 
