@@ -1,0 +1,75 @@
+#!/usr/bin/env node
+
+/**
+ * Sets the BibTeX key field (user1) using your own formula
+ * here: <authors's last names, concatenated by '+'>-<year>-<first non-stop-word in title>
+, 
+ */
+
+// see readme.md first to configure the examples
+require('dotenv').config();
+
+const process = require('process');
+const bookends = require('../index');
+const Gauge = require('gauge');
+const Confirm = require('prompt-confirm');
+
+(async () => {
+
+const gauge = new Gauge();
+
+let 
+  ids = await bookends.getGroupReferenceIds('all'),
+  total = ids.length,
+  message = `This will overwrite the BibTeX keys of ${total} references. Are you sure?`,
+  thedefault = false;
+
+if( ! await new Confirm({ message, default:thedefault}).run() ) process.exit(0);
+
+const fields = ['authors','editors','thedate','title','user1','uniqueID'];
+const stop_words = ['der','die','das','ein','eine','the'];
+const punctuationRegExpr = /[\u2000-\u206F\u2E00-\u2E7F\\'!"«»#$%&()*+,\-.\/:;<=>?@\[\]^_`{|}~]/g;
+
+gauge.show("Retrieving Bookends data...",0);
+let refs = (await bookends.readReferences(ids,fields));
+let updated_refs = [];
+
+for (let [index, data] of refs.entries()) {
+  // use up to three author last names and cocatenate them by "+"
+  let author_last_names = (data.authors||data.editors)
+  .split(/\n/)
+  .slice(0,2)
+  .reduce((prev,curr) => (prev?"+":"") + curr.split(/,/)[0].trim().replace(/\s/g,"_").toLocaleLowerCase(), "") || "anonymous";
+  // take the first word in the title that is not a stop word and has more than two letters
+  let title_first_word = data.title
+  .replace(punctuationRegExpr,"")
+  .split(/ /)
+  .filter(word => word.length > 2 && ! stop_words.some(sw => sw.toLocaleLowerCase() === word.toLocaleLowerCase()))
+  .reduce((prev,curr)=>prev?prev:curr,"")
+  .normalize()
+  .toLocaleLowerCase();
+  let year = (data.thedate.match(/([0-9]{4})/)||[,])[1] || "noyear"
+  // bibtex key is "author1+author2-date-titleword"
+  let key = author_last_names + "-" + year + "-" + title_first_word
+  updated_refs.push({
+    uniqueID: data.uniqueID,
+    user1: key
+  });
+}
+// this fakes a progress feedback, since we are submitting the data in a batch
+// the result might be more or less convincing depending on the speed of your machine 
+let counter = 0;
+let intervalId = setInterval(() => {
+  gauge.show(`Updating BibTeX key (${counter}/${total})...`, counter/total);
+  gauge.pulse();
+  counter = Math.min(counter+2,total);
+},50);
+await bookends.updateReferences(updated_refs);
+clearInterval(intervalId);
+gauge.hide();
+console.info(`Updated ${total} BibTex keys.`);
+
+
+})().catch(e => console.error(e));
+
+
