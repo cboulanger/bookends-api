@@ -35,6 +35,7 @@
     "multistream": "^2.1.1",
     "request": "^2.87.0",
     "yargs": "^12.0.1",
-    "zotero": "^0.4.1"
+    "zotero": "^0.4.1",
+    "prompt-confirm": "^2.0.4"
   }
 }

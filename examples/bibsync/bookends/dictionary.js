@@ -100,7 +100,7 @@ const fields_toLocal =
     translateContent: function (data) {
       return data.authors.split(/;/).map(function (elem) {
         return elem.trim();
-      }).join(", and ");
+      }).join("\n");
     }
   },
   authorTranslated: 'user9',
@@ -121,7 +121,7 @@ const fields_toLocal =
     translateContent: function (data) {
       return data.editors.split(/;/).map(function (elem) {
         return elem.trim();
-      }).join(", and ");
+      }).join("\n");
     }
   },
   issue: {
@@ -154,7 +154,16 @@ const fields_toLocal =
   title: 'title',
   title2: 'title2',
   titleTranslated: 'user10',
-  translators: 'user3',
+  translators: {
+    translateName: function (data) {
+      return 'user3';
+    },
+    translateContent: function (data) {
+      return data.authors.split(/;/).map(function (elem) {
+        return elem.trim();
+      }).join("\n");
+    }
+  },
   url: 'url',
   university: 'publisher',
   websiteTitle: 'journal',
