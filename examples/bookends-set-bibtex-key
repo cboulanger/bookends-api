@@ -14,11 +14,6 @@ const bookends = require('../index');
 const Gauge = require('gauge');
 const Confirm = require('prompt-confirm');
 
-require('death')((signal,err)=>{
-  console.log(signal);
-  process.exit(0);
-});
-
 (async () => {
 
 const gauge = new Gauge();
