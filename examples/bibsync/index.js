@@ -17,11 +17,11 @@ const Translator = require('./translator');
  */
 class Base extends EventEmitter {
   /**
-   * Constructor. The constructor receives an object from which the properties of the instance are 
-   * set, after being validated. It calls the class-specific init() method, which sets instance property 
-   * defaults  and returns a validator object, its keys being the property names and the values being
-   * functions which, when passed a property value, return a) true if validation is successful or
-   * b) false (for generic rejection) or a string (custom error message) if validation fails. 
+   * The constructor receives an object from which the properties of the instance are set, after
+   * being validated. It calls the class-specific init() method, which sets instance property defaults
+   * and returns a validator object. The keys of this object are  the property names, the values 
+   * are functions which, when passed a property value, return a) true if validation is successful
+   * or b) false (for generic rejection) or a string (custom error message) if validation fails. 
    * @param {{}} config 
    */
   constructor(config = {}) {
