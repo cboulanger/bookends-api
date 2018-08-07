@@ -1,3 +1,8 @@
+/**
+ * The Translator class takes care of translating fields from one application to the other
+ * @module bibsync
+ */
+
 const util = require('util');
 
 /**

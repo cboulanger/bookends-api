@@ -31,8 +31,18 @@ let refs = (await bookends.readReferences(ids,fields));
 let updated_refs = [];
 
 for (let [index, data] of refs.entries()) {
+  // fix some unrelated problems, this will be removed 
+  ['authors','editors'].forEach(creator => {
+    if (data[creator].includes(", and ")) {
+      updated_data[creator] = data[creator].replace(/, and /g,"\n");
+    }
+    if (data[creator].includes(";")) {
+      updated_data[creator] = data[creator].split(/;/).map(creator => creator.trim()).join("\n");
+    }    
+  });
   // use up to three author last names and cocatenate them by "+"
   let author_last_names = (data.authors||data.editors)
+  .normalize()
   .split(/\n/)
   .slice(0,3)
   .map(author => author.split(/,/)[0].trim().replace(/\s/g,"-").toLocaleLowerCase())
@@ -52,12 +62,6 @@ for (let [index, data] of refs.entries()) {
     uniqueID: data.uniqueID,
     user1: key
   };
-  // this fixes ", and" instead of "\n"
-  ['authors','editors'].forEach(creator => {
-    if (data[creator].includes(", and ")) {
-      updated_data[creator] = data[creator].replace(/, and /g,"; ");
-    }
-  })
   updated_refs.push(updated_data);
 }
 

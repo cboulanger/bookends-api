@@ -23,6 +23,7 @@
   },
   "homepage": "https://github.com/cboulanger/bookends-api#readme",
   "dependencies": {
+    "debug": "^3.1.0",
     "node-osascript": "^2.0.0"
   },
   "devDependencies": {
