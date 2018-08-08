@@ -12,16 +12,20 @@ const crypto = require('crypto');
 
 const zotero = require('zotero');
 const request = require('request');
-const bibsync = require('../api');
+const bibsync = require('..');
 
 zotero.promisify(util.promisify.bind(Promise));
 
 const pathRegExp = /(groups|users)\/([0-9]+)/;
 
+// symbols
+const symbolZoteroLibrary = Symbol("zotero-node library object");
+
+
 /**
  * A class modeling a Zotero library
  */
-class Library extends bibsync.Library {
+class ZoteroLibrary extends bibsync.Library {
 
   constructor(config) {
     // this calls the init() method implicitly
@@ -33,7 +37,7 @@ class Library extends bibsync.Library {
       throw new Error(`Invalid 'prefix' config "${this.prefix}"`);
     }
     options[type.substr(0,type.length-1)] = parseInt(id); // strip off "s"
-    this.__library = new zotero.Library(options);
+    this[symbolZoteroLibrary] = new zotero.Library(options);
   }
 
   init(){
@@ -52,8 +56,16 @@ class Library extends bibsync.Library {
 
     // call parent method and merge validators
     return Object.assign(super.init(),{
-      prefix: v => v.match(pathRegExp).length ? true : `'${v}' is not a valid zotero path prefix`,
-      apiKey: v => v && typeof v === "string"
+      prefix: {
+        validate: v => v.match(pathRegExp).length ? true : `'${v}' is not a valid zotero path prefix`,
+        required: true
+      },
+      apiKey: {
+        validate: v => v && typeof v === "string",
+        required: true
+      }
     });
   }
 }
+
+let l = new ZoteroLibrary({prefix:"users/100", apiKey:"aasfasfs", id: "zotero:user:100"});
