@@ -18,10 +18,13 @@ class Library extends bibsync.Library {
        * @type {String}
        */
       this.name = "";
+
   
       // call parent method and merge validators
       return Object.assign(super.init(),{
         name: v => v && typeof v === "string"
       });
     }
+
+    
   }

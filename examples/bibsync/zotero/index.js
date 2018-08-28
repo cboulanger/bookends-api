@@ -19,13 +19,12 @@ zotero.promisify(util.promisify.bind(Promise));
 const pathRegExp = /(groups|users)\/([0-9]+)/;
 
 // symbols
-const symbolZoteroLibrary = Symbol("zotero-node library object");
 
 
 /**
  * A class modeling a Zotero library
  */
-class ZoteroLibrary extends bibsync.Library {
+class Library extends bibsync.Library {
 
   constructor(config) {
     // this calls the init() method implicitly
@@ -37,7 +36,7 @@ class ZoteroLibrary extends bibsync.Library {
       throw new Error(`Invalid 'prefix' config "${this.prefix}"`);
     }
     options[type.substr(0,type.length-1)] = parseInt(id); // strip off "s"
-    this[symbolZoteroLibrary] = new zotero.Library(options);
+    this._library = new zotero.Library(options);
   }
 
   init(){
@@ -66,6 +65,7 @@ class ZoteroLibrary extends bibsync.Library {
       }
     });
   }
+
+  
 }
 
-let l = new ZoteroLibrary({prefix:"users/100", apiKey:"aasfasfs", id: "zotero:user:100"});

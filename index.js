@@ -77,7 +77,7 @@ function runOsaCmd(cmd, debug=false) {
 }
 
 /**
- * xx@module bookends-api
+ * @module bookends-api
  */
 let bookends = {
   /**

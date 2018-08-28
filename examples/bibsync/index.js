@@ -116,6 +116,8 @@ class Library extends Base {
      */
     this.id = "";
 
+    
+
     return Object.assign(super.init(),{
       version: v => (typeof v === "number" && parseInt(v) === v) ? true : "Version must be an integer.",
       id: {
@@ -124,6 +126,16 @@ class Library extends Base {
       }
     });
   }
+
+  /**
+   * Returns an array of the ids of the records that have changed since the given version of
+   * the library
+   */
+  getIdsModifiedSinceVersion(version) {
+    throw new Error("Method not implemented");
+  }
+
+
 }
 
 class Synchronization extends Base {
@@ -133,11 +145,13 @@ class Synchronization extends Base {
      * @type {Library}
      */
     this.source = null;
+
     /**
      * The target library
      * @type {null}
      */
     this.target = null;
+
     /**
      * Whether this synchronization is bidirectional (default false)
      * @type {boolean}
@@ -155,6 +169,10 @@ class Synchronization extends Base {
       },
       bidirectional: v => typeof v === "boolean"
     });
+  }
+
+  start() {
+
   }
 }
 
