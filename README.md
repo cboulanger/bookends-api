@@ -35,7 +35,7 @@ Optionen:
 
 WARNING: This is alpha-grade software solely for testing and proof-of-concept purposes. DO *NOT* use Bookends libraries that you depend on. You have been warned. 
 
-To use it, open a new (!) Bookends library, and execute the command as follows:
+To use it, open a new (!) Bookends library, add one (empty) item (this is required to avoid a runtime error), and execute the command as follows:
 
 ```
 $ examples/bookends-zotero-sync groups/<the numeric id of the group> --target=bookends --key=<Your Zotero API key>
