@@ -9,12 +9,12 @@ describe('Bookends', async function() {
   this.timeout(20000);
   before(fixture.before);
   after(fixture.after);
-  
+
   it('should report its version number', async () => {
     let version = await bookends.getVersion();
     assert( util.isString(version), "Version is not a string." );
     assert( parseInt(version) > 12, "Version must be greater than 12");
-  }); 
+  });
 
   it('should list unique ids of references contained in groups', async () => {
     let allRefIds = await bookends.getGroupReferenceIds('All');
@@ -22,32 +22,31 @@ describe('Bookends', async function() {
     assert.equal( allRefIds.length, 11, "Incorrect number of total references." );
     let idsInFoo1 = await bookends.getGroupReferenceIds('foo1');
     assert.equal( idsInFoo1.length, 2);
-  }); 
+  });
 
   it('should find references using an sql query', async () => {
     let refIds = await bookends.findIdsWhere("title REGEX 'Bibliographic'");
     assert( util.isArray(refIds), "Method did not return an Array");
     assert.equal( refIds.length, 6, "Incorrect number of found references." );
-  });   
+  });
 
   it('should return formatted references', async () => {
     let result = await bookends.formatReferences([41103,57913], "APA 6th Edition",false);
-    assert( util.isArray(result), "Method did not return an Array");
-    assert.equal( result.length, 2 );
-    let expected = [ 
+    assert( Array.isArray(result), "Method did not return an Array");
+    let expected = [
       'Dempsey, L. (1990). Bibliographic access in Europe : first international conference. Aldershot, Hants, England; Brookfield, Vt., USA: Gower.',
       'Willer, M., & Dunsire, G. (2013). Bibliographic information organization in the semantic web. Oxford: Chandos Pub.'
     ];
     assert.deepStrictEqual(result, expected);
-  });    
-  
+  });
+
   it('should return a list of groups', async () => {
     let result = await bookends.getGroupNames();
     assert( util.isArray(result), "Method did not return an Array");
     assert.deepStrictEqual(result, [ 'Bar', 'bar1', 'bar2', 'Baz', 'baz1', 'Foo', 'foo1', 'foo2' ]);
     result = await bookends.getGroupNames(true);
     assert( util.isArray(result), "Method did not return an Array");
-    assert.deepStrictEqual(result, [ 
+    assert.deepStrictEqual(result, [
       'Bar',
       'Bar/bar1',
       'Bar/bar2',
@@ -66,20 +65,20 @@ describe('Bookends', async function() {
     assert.equal( createdGroupName, groupName);
     let idsInBoo1 = await bookends.getGroupReferenceIds('boo1');
     assert.deepStrictEqual(idsInBoo1, idsInFoo1);
-  });  
+  });
 
   it('should add references to the new group', async () => {
     let idsInBoo1 = await bookends.getGroupReferenceIds('boo1');
     let idsInFoo2 = await bookends.getGroupReferenceIds('foo2');
     let msg = await bookends.addToStaticGroup("boo1", idsInFoo2 );
     assert.equal( (await bookends.getGroupReferenceIds('boo1')).length, idsInBoo1.length + idsInFoo2.length);
-  });    
+  });
 
   it('should retrieve reference data', async () => {
     let idsInBoo1 = await bookends.getGroupReferenceIds('foo2');
     let fields = "type,authors,title,thedate,location,publisher".split(/,/);
     let data = await bookends.readReferences(idsInBoo1, fields);
-    let expected = [ 
+    let expected = [
       { authors: 'Bade, David W.',
         location: "Duluth, Minn.",
         publisher: 'Library Juice Press',
@@ -93,7 +92,7 @@ describe('Bookends', async function() {
         thedate: '1973',
         title: 'The British Library and AACR: report of a study commissioned by the Department of Education and Science; director of study A. H. Chaplin.',
         type: "Book",
-        uniqueID: 86287 } 
+        uniqueID: 86287 }
     ];
     assert.deepStrictEqual(data,expected);
   });
@@ -109,14 +108,14 @@ describe('Bookends', async function() {
     await bookends.updateReferences(data);
     data = await bookends.readReferences(idsInBoo1, fields);
     // for some reason, the references are returned in reverse order
-    let expected = [ 
+    let expected = [
       { authors: 'Chaplin, A. H.',
         location: "London",
         publisher: 'Library Association',
         thedate: '1973',
         title: 'The quick brown fox jumps over the lazy dog. ÄÖÜßáà',
         type: "Book",
-        uniqueID: 86287 },       
+        uniqueID: 86287 },
       { authors: "Doe, John",
         location: "Duluth, Minn.",
         publisher: 'Library Juice Press',
@@ -129,7 +128,7 @@ describe('Bookends', async function() {
   });
 
   it('should create references', async () => {
-    let refs = [ 
+    let refs = [
       { authors: 'Doe, Jane',
         thedate: '2008',
         title: 'Compiling a bibliography is so much fun!',
@@ -150,7 +149,7 @@ describe('Bookends', async function() {
       }
     ];
     await bookends.addReferences(refs);
-  });     
+  });
 
   it('should retrieve modification dates', async () => {
     let allIds = await bookends.getGroupReferenceIds('All');
@@ -159,5 +158,5 @@ describe('Bookends', async function() {
     modDates.forEach(date => {
       if ( ! date instanceof Date ) throw new Error("Invalid date in result");
     });
-  });   
+  });
 });

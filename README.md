@@ -43,6 +43,9 @@ $ examples/bookends-zotero-sync groups/<the numeric id of the group> --target=bo
 
 This does a one-way sync between the Zotero group library to the currently opened Bookends library. If the script works as intended, you should be able to update this library with new additions and changes from the Zotero library. The script can also do Bookends-to-Zotero and two-way sync, but the synchronization algorithm is not perfect yet, which is due to the fact that it is difficult to store synchronization metadata in Bookends itself. 
 
+## Testing
+
+`npm test`
 
 ## Resources
 - [API Documentation](https://cboulanger.github.io/bookends-api/module-bookends-api.html) 

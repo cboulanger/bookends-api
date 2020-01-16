@@ -1,6 +1,6 @@
 /*
- * Bookends (>=v13.1.1) API client 
- * 
+ * Bookends (>=v13.1.1) API client
+ *
  * Uses code by ComplexPoint at https://www.sonnysoftware.com/phpBB3/viewtopic.php?f=2&t=4017
  * @author Christian Boulanger (cboulanger)
  */
@@ -9,7 +9,7 @@ const osascript = require('node-osascript');
 const util = require('util');
 
 /**
- * Given an event code and additional parameters, return the AppleScript command. 
+ * Given an event code and additional parameters, return the AppleScript command.
  * @param {String} eventCode
  * @param {mixed} param1, param2, ...
  * @return {String}
@@ -22,7 +22,7 @@ function command(eventCode, ...parameters) {
 
 /**
  * Returns the string enclosed by double quotes, with all double quotes escaped
- * @param {String} str 
+ * @param {String} str
  */
 function quote(str){
   if( ! util.isString(str) ) throw new Error("Argument must be a string.");
@@ -31,7 +31,7 @@ function quote(str){
 
 /**
  * Trims the result of an OSA call to Bookends, removing the quotes at the beginning/end
- * @param {String} item 
+ * @param {String} item
  */
 function removeQuotes(item) {
   return item.substring(1, item.length - 2);
@@ -39,8 +39,8 @@ function removeQuotes(item) {
 
 /**
  * Execute a command via OSA and process the result. Returns a Promise
- * that resolves to an array of Strings (splitChar: String|undefined) or a 
- * String (splitChar: false). 
+ * that resolves to an array of Strings (splitChar: String|undefined) or a
+ * String (splitChar: false).
  * @param {String} cmd
  * @param {Boolean} debug If true, log diagnostic information to the console
  * @return {Promise<*>}
@@ -160,7 +160,7 @@ let bookends = {
   codeFromType : function(type) {
     if ( ! type || !util.isString(type)){
       throw new Error("Parameter must be a string");
-    } 
+    }
     let code = this.getTypes().findIndex(item => type === item);
     if (code === -1) {
       throw new Error(`Invalid type '${type}'`);
@@ -176,7 +176,7 @@ let bookends = {
   typeFromCode : function(code) {
     if ( ! util.isNumber(code)) {
       throw new Error("Parameter must be a number");
-    } 
+    }
     if ( code < 0 || code >= 40 ) {
       throw new Error("Code out of range");
     }
@@ -203,7 +203,7 @@ let bookends = {
   getGroupReferenceIds: function(groupName) {
     if ( ! groupName || !util.isString(groupName)){
       throw new Error("Parameter must be a string");
-    } 
+    }
     return runOsaCmd(command('RUID', quote(groupName)))
     .then( result => removeQuotes(result).split(/\r/).map( item => parseInt(item)) );
   },
@@ -217,7 +217,7 @@ let bookends = {
   findIdsWhere: function(search) {
     if ( ! search || !util.isString(search)){
       throw new Error("Parameter must be a string");
-    } 
+    }
     return runOsaCmd(command('SQLS', quote(search)))
     .then( result => removeQuotes(result).split(/\r/).map( item => parseInt(item)));
   },
@@ -225,36 +225,36 @@ let bookends = {
   /**
    * Ask Bookends to return formatted references.
    * Given the unique id, you can obtain the formatted reference, as plain text or RTF.
-   * Returns a promise that resolves to an Array containing the formatted references. 
-   * @param {Array} ids 
+   * Returns a promise that resolves to an Array containing the formatted references.
+   * @param {Array} ids
    * @param {String} format
-   * @param {Boolean} asRtf 
+   * @param {Boolean} asRtf
    * @return {Promise<String[]>}
    */
   formatReferences: function(ids, format, asRtf=false) {
     if ( ! Array.isArray(ids)){
       throw new Error("First parameter must be an Array");
-    } 
+    }
     if ( ! format || ! util.isString(format)){
       throw new Error("Second parameter must be a non-empty String");
     }
-    let cmd = command('GUID', 
-      quote(ids.join(',')), 
+    let cmd = command('GUID',
+      quote(ids.join(',')),
       `given «class RRTF»:"${asRtf?'true':'false'}", string:"${format}"`
     );
     return runOsaCmd(cmd)
-    .then(result => result.substring(1, result.length-3).split(/\r\r/).map(item => item.trim()));
+    .then(result => result.substring(1, result.length-3).split(/\r/).map(item => item.trim()));
   },
 
   /**
    * Get group names.
-   * Returns a Promise that resolves to an array of names of all user-created groups, static and smart, 
+   * Returns a Promise that resolves to an array of names of all user-created groups, static and smart,
    * in the frontmost library window, sorted alphabetically by group name.
-   * 
-   * @param {Boolean} includePath 
-   *  if True Bookends will return the folder hierarchy for each group, where slashes separates the folders 
-   *  and groups: "top folder/inner folder/group name". Note that the items will be ordered by group name, 
-   *  not the full path, so that zfolder/a comes before afolder/b. If a group name contains a slash (/), 
+   *
+   * @param {Boolean} includePath
+   *  if True Bookends will return the folder hierarchy for each group, where slashes separates the folders
+   *  and groups: "top folder/inner folder/group name". Note that the items will be ordered by group name,
+   *  not the full path, so that zfolder/a comes before afolder/b. If a group name contains a slash (/),
    *  it will be escaped as //.
    * @return {Promise<String[]>}
    */
@@ -267,37 +267,37 @@ let bookends = {
 
   /**
    * Create a new static group and (optionally) populate it with references.
-   * Returns a Promise that resolves to the name of the added group.  This is helpful when you specify a 
+   * Returns a Promise that resolves to the name of the added group.  This is helpful when you specify a
    * name that is already in use and Bookends appends a number to make it unique.
-   * @param {String} groupName 
-   * @param {Array|undefined} ids 
+   * @param {String} groupName
+   * @param {Array|undefined} ids
    * @return {Promise<String>}
    */
   createStaticGroup : function(groupName, ids=[]) {
     if ( ! groupName || ! util.isString(groupName)) {
       throw new Error("First parameter must be a non-empty String");
-    }       
+    }
     if ( ! Array.isArray(ids)) {
       throw new Error("Second parameter must be an Array");
-    } 
+    }
     let cmd = command('ADDG', quote(groupName), `given string:"${ids.join(',')}"`);
     return runOsaCmd(cmd);
   },
 
   /**
    * Add references to an existing static group
-   * Returns a Promise with the number of references added. 
-   * @param {String} groupName 
-   * @param {Array|undefined} ids 
+   * Returns a Promise with the number of references added.
+   * @param {String} groupName
+   * @param {Array|undefined} ids
    * @return {Promise<Number>}
    */
   addToStaticGroup : function(groupName, ids=[]) {
     if ( ! groupName || ! util.isString(groupName)) {
       throw new Error("First parameter must be a non-empty String");
-    }       
+    }
     if ( ! Array.isArray(ids)) {
       throw new Error("Second parameter must be an Array");
-    } 
+    }
     let cmd = command('ADTG', quote(groupName), `given string:"${ids.join(',')}"`);
     return runOsaCmd(cmd);
   },
@@ -307,7 +307,7 @@ let bookends = {
    * contain the data of the corresponding references with the given fields.
    * @param {Array} ids An array with at least one id
    * @param {Array} fieldNames An array with at least one field name
-   * @param {Boolean} convertType 
+   * @param {Boolean} convertType
    *    If true, convert the numeric reference type codess into their string representation
    *    (i.e. 0 => "Journal Article").
    * @return {Promise<Object[]>}  A promise resolving with to an array of json objects
@@ -315,7 +315,7 @@ let bookends = {
   readReferences : function(ids, fieldNames, convertType=true) {
     if ( ! Array.isArray(ids) || ids.length < 1 ) {
       throw new Error("First parameter must be an Array with at least one element");
-    }       
+    }
     if ( ! Array.isArray(fieldNames) || fieldNames.length < 1 ) {
       throw new Error("First parameter must be an Array with at least one element");
     }
@@ -339,10 +339,10 @@ let bookends = {
           if( typeof item.type === "number") {
             item.type = this.typeFromCode(item.type);
           }
-          return item; 
+          return item;
         });
       }
-      return refs; 
+      return refs;
     });
   },
 
@@ -372,7 +372,7 @@ let bookends = {
       });
       return item;
     });
-    let json;       
+    let json;
     try{
       json = JSON.stringify(data).replace(/\\/g,'\\\\');
     } catch (e) {
@@ -380,7 +380,7 @@ let bookends = {
     }
     return runOsaCmd(command( 'SJSN', quote(json) ))
     .then(result => {
-      if ( result === null) return; 
+      if ( result === null) return;
       throw new Error( `updateReferences() failed.\n >>> Error:\n${result}\n >>> Data:\n${json}`);
     });
   },
@@ -393,7 +393,7 @@ let bookends = {
   addReferences: async function(data) {
     if ( ! Array.isArray(data) || data.length < 1 ) {
       throw new Error("Parameter must be an array with at least one element");
-    } 
+    }
     for ( let i=0; i < data.length; i++) {
       let item = data[i];
       if ( ! util.isObject(item) || item.type === undefined ) {

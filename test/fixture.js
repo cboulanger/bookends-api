@@ -7,6 +7,7 @@ const process = require('process');
 
 module.exports = {
   before : async function() {
+    require ('dotenv').config();
     if( ! (process.env.ZOTERO_API_KEY
     && process.env.ZOTERO_USER_ID
     && process.env.ZOTERO_GROUP_ID
@@ -18,8 +19,9 @@ module.exports = {
     this.bookendsProcess = spawn(bookendsExecutablePath, [__dirname + '/test.bdb']);
     console.log("Waiting for Bookends to start ...");
     await new Promise(resolve => setTimeout( () => resolve(), 10000));
-  }, 
+  },
   after: async function() {
     osascript.execute('tell application "Bookends" to quit');
+    fs.unlinkSync(__dirname + '/test.bdb');
   }
-};  
+};
