@@ -172,7 +172,7 @@ const fields_toLocal =
       return "volume";
     },
     translateContent: function (data) {
-      return  (data['volume']?`${data['volume']} `:"") + (data['issue']?`(${data['issue']})`:"")
+      return  (data['volume']?`${data['volume']}`:"") + (data['issue']?`(${data['issue']})`:"")
     }
   },
   archive: false,
