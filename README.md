@@ -23,8 +23,8 @@ bookends-zotero-sync <path> [options]
 Synchronizes a Bookends database with a Zotero library.
 
 Positionals:
-  path  the path to the zotero library, either groups/<group id> or user/<user
-        id>.                                                            [string]
+  path  the path to the zotero library, either groups/<group id> or users/<user id>
+                                                                        [string]
 
 Optionen:
   --target   If given, do only one-way sync to target                   [string]

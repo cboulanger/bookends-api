@@ -172,7 +172,7 @@ const fields_toLocal =
       return "volume";
     },
     translateContent: function (data) {
-      return  (data['volume']?`${data['volume']} `:"") + (data['issue']?`(${data['issue']})`:"")
+      return  (data['volume']?`${data['volume']}`:"") + (data['issue']?`(${data['issue']})`:"")
     }
   },
   archive: false,
@@ -244,7 +244,7 @@ const fields_toLocal =
   studio: false,
   subject: false,
   system: false,
-  thesisType: false,
+  thesisType: 'user2',
   mapType: false,
   manuscriptType: false,
   letterType: false,
@@ -341,7 +341,14 @@ const fields_toGlobal = {
   user5: 'callNumber',
   thedate: 'date',
   user17: 'doi',
-  user2: 'edition',
+  user2: function (item) {
+    switch (item.type) {
+      case "Dissertation":
+        return "thesisType";
+      default:
+        return "edition";
+    }
+  },
   user6: function (item) {
     switch (item.type) {
       case "journal":
