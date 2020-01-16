@@ -23,20 +23,20 @@
   },
   "homepage": "https://github.com/cboulanger/bookends-api#readme",
   "dependencies": {
-    "debug": "^3.1.0",
-    "node-osascript": "^2.0.0"
+    "debug": "^3.2.6",
+    "node-osascript": "^2.1.0"
   },
   "devDependencies": {
-    "dotenv": "^6.0.0",
+    "dotenv": "^6.2.0",
     "gauge": "^2.7.4",
     "into-stream": "^3.1.0",
-    "jsdoc": "^3.5.5",
+    "jsdoc": "^3.6.3",
     "md5-file": "^4.0.0",
     "mocha": "^5.2.0",
     "multistream": "^2.1.1",
     "prompt-confirm": "^2.0.4",
-    "request": "^2.87.0",
-    "yargs": "^12.0.1",
+    "request": "^2.88.0",
+    "yargs": "^12.0.5",
     "zotero": "^0.4.1"
   }
 }
