@@ -32,7 +32,7 @@
     "into-stream": "^3.1.0",
     "jsdoc": "^3.6.3",
     "md5-file": "^4.0.0",
-    "mocha": "^5.2.0",
+    "mocha": "^10.2.0",
     "multistream": "^2.1.1",
     "prompt-confirm": "^2.0.4",
     "request": "^2.88.0",
